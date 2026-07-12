@@ -51,11 +51,11 @@ module.exports = defineConfig([
       ],
     },
     rules: {
-      'boundaries/element-types': [
+      'boundaries/dependencies': [
         'error',
         {
           default: 'allow',
-          rules: [
+          policies: [
             {
               from: [{ element: { type: 'feature' } }],
               disallow: [
