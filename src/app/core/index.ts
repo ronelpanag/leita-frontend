@@ -1,3 +1,7 @@
-// Barrel for core: auth, http interceptors, guards, singleton services.
-// Populated from Phase 3 onward.
-export {};
+// Core barrel: auth, guards, interceptor, typed API layer.
+export { API_BASE_URL, ApiClient, SKIP_AUTH_REFRESH } from './api/api-client';
+export * from './api/api-types';
+export { authGuard } from './auth/auth-guard';
+export { authInterceptor } from './auth/auth-interceptor';
+export { AuthService, type AuthUser } from './auth/auth-service';
+export { roleGuard } from './auth/role-guard';

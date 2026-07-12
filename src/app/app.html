@@ -1,4 +1,54 @@
-<main class="min-h-screen grid place-items-center bg-surface text-ink">
-  <h1 class="text-heading-1 font-semibold">Leita</h1>
+<a
+  href="#main"
+  class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-paper focus:px-3 focus:py-2 focus:text-body-sm"
+>
+  Skip to main content
+</a>
+
+<header class="border-b border-line bg-paper">
+  <nav
+    class="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-gutter"
+    aria-label="Main"
+  >
+    <a
+      routerLink="/jobs"
+      class="flex items-center gap-2 font-display text-heading-3 font-semibold text-ink"
+      translate="no"
+    >
+      <svg viewBox="0 0 8 8" aria-hidden="true" class="size-2.5 fill-spruce-700">
+        <path d="M1 0l6 4-6 4z" />
+      </svg>
+      Leita
+    </a>
+    <div class="flex items-center gap-2">
+      @if (auth.isAuthenticated()) {
+        <a
+          [routerLink]="auth.homeUrl()"
+          class="rounded-control px-3 py-1.5 text-body-sm font-medium text-ink transition-colors hover:bg-birch"
+        >
+          {{ auth.user()?.role === 'Candidate' ? 'Your applications' : 'Hiring dashboard' }}
+        </a>
+        <app-button variant="secondary" size="sm" (click)="logout()">Log out</app-button>
+      } @else {
+        <a
+          routerLink="/login"
+          class="rounded-control px-3 py-1.5 text-body-sm font-medium text-ink transition-colors hover:bg-birch"
+        >
+          Log in
+        </a>
+        <a
+          routerLink="/register"
+          class="rounded-control bg-spruce-700 px-3 py-1.5 text-body-sm font-medium text-paper transition-colors hover:bg-spruce-900"
+        >
+          Create account
+        </a>
+      }
+    </div>
+  </nav>
+</header>
+
+<main id="main">
+  <router-outlet />
 </main>
-<router-outlet />
+
+<app-toast-outlet />

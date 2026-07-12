@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { authGuard, roleGuard } from '@core';
 
 declare const ngDevMode: boolean | undefined;
 
@@ -14,4 +15,33 @@ const devRoutes: Routes =
       ]
     : [];
 
-export const routes: Routes = [...devRoutes];
+export const routes: Routes = [
+  { path: '', pathMatch: 'full', redirectTo: 'jobs' },
+  {
+    path: 'jobs',
+    loadChildren: () => import('./features/jobs/jobs.routes').then((m) => m.JOBS_ROUTES),
+  },
+  {
+    path: 'candidate',
+    canActivate: [authGuard, roleGuard('Candidate')],
+    loadChildren: () =>
+      import('./features/candidate/candidate.routes').then((m) => m.CANDIDATE_ROUTES),
+  },
+  {
+    path: 'company',
+    canActivate: [authGuard, roleGuard('CompanyAdmin', 'Recruiter')],
+    loadChildren: () => import('./features/company/company.routes').then((m) => m.COMPANY_ROUTES),
+  },
+  {
+    path: 'login',
+    loadComponent: () => import('./features/auth/login-page').then((m) => m.LoginPage),
+    title: 'Log in — Leita',
+  },
+  {
+    path: 'register',
+    loadComponent: () => import('./features/auth/register-page').then((m) => m.RegisterPage),
+    title: 'Create an account — Leita',
+  },
+  ...devRoutes,
+  { path: '**', redirectTo: 'jobs' },
+];
