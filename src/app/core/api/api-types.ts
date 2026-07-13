@@ -68,6 +68,11 @@ export interface JobPostingSummary {
   readonly title: string;
   readonly location: string | null;
   readonly publishedAtUtc: string | null;
+  /**
+   * UI hook for the Promotions roadmap feature — the backend does not send
+   * this yet; featured styling activates automatically once it does.
+   */
+  readonly promoted?: boolean;
 }
 
 export interface JobPostingDetail {
@@ -80,6 +85,8 @@ export interface JobPostingDetail {
   readonly createdAtUtc: string;
   readonly publishedAtUtc: string | null;
   readonly closedAtUtc: string | null;
+  /** UI hook for the Promotions roadmap feature (not sent by the backend yet). */
+  readonly promoted?: boolean;
 }
 
 export interface CreateJobPostingRequest {

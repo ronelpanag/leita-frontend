@@ -12,9 +12,11 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 })
 export class Card {
   readonly featured = input(false);
+  /** Disable when the projected content manages its own padding (e.g. a full-card link). */
+  readonly padded = input(true);
 
   protected readonly classes = computed(() => {
-    const base = 'block rounded-card border bg-paper p-6';
+    const base = `block rounded-card border bg-paper${this.padded() ? ' p-6' : ''}`;
     return this.featured()
       ? `${base} border-cloudberry-500 shadow-[inset_0_2px_0_0_var(--color-cloudberry-500)]`
       : `${base} border-line`;
