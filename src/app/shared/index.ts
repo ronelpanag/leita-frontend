@@ -7,6 +7,7 @@ export { TextInput } from './components/input/text-input';
 export { Modal } from './components/modal/modal';
 export { SelectField, type SelectOption } from './components/select/select-field';
 export { Spinner, type SpinnerSize } from './components/spinner/spinner';
+export { TextArea } from './components/textarea/text-area';
 export { CellDef, DataTable, type TableColumn } from './components/table/data-table';
 export { ToastOutlet } from './components/toast/toast-outlet';
 export { ToastService, type Toast, type ToastTone } from './components/toast/toast-service';

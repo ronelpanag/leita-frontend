@@ -23,7 +23,16 @@ job card and the detail page render featured styling (cloudberry accent +
 "Featured" badge) the moment the API starts sending it. No frontend change
 will be needed.
 
-## 3. SSR / prerendering for job detail SEO (noted, not urgent)
+## 3. Job title (and company name) in `ApplicationDto` (Phase 5)
+
+`GET /api/candidate/applications` returns applications with only
+`jobPostingId`. The candidate dashboard must show which role each
+application belongs to, so today it resolves titles with one extra
+`GET /api/public/jobs/{id}` per distinct posting — an N+1 that also
+breaks for postings a company later deletes. Adding `jobTitle` (and
+ideally `companyName`) to `ApplicationDto` removes the fan-out.
+
+## 4. SSR / prerendering for job detail SEO (noted, not urgent)
 
 Job detail pages set `<title>` and `meta description` at runtime. Crawlers
 that execute JS see them; plain-HTML crawlers do not. If organic search

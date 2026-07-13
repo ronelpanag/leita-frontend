@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ApiClient } from '../api/api-client';
+import { FollowsStore } from '../candidate/follows-store';
 import type {
   AuthResponse,
   LeitaRole,
@@ -26,6 +27,7 @@ const REFRESH_TOKEN_KEY = 'leita.refreshToken';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly api = inject(ApiClient);
+  private readonly follows = inject(FollowsStore);
 
   private readonly accessTokenSignal = signal<string | null>(null);
   private readonly userSignal = signal<AuthUser | null>(null);
@@ -76,6 +78,7 @@ export class AuthService {
   logout(): void {
     this.accessTokenSignal.set(null);
     this.userSignal.set(null);
+    this.follows.reset();
     sessionStorage.removeItem(REFRESH_TOKEN_KEY);
   }
 

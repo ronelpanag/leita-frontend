@@ -10,8 +10,8 @@ import {
 } from '@angular/core';
 import { Meta, Title } from '@angular/platform-browser';
 import { Router, RouterLink } from '@angular/router';
-import { ApiClient, AuthService, type JobPostingDetail } from '@core';
-import { Badge, Button, Card, EmptyState, Spinner } from '@shared';
+import { ApiClient, AuthService, FollowsStore, type JobPostingDetail } from '@core';
+import { Badge, Button, Card, EmptyState, Spinner, ToastService } from '@shared';
 import { firstValueFrom } from 'rxjs';
 
 const publishedFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'long' });
@@ -82,7 +82,18 @@ const publishedFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }
                   </p>
                 </div>
               } @else if (auth.user()?.role === 'Candidate') {
-                <app-button (click)="applyAsCandidate()">Apply for this role</app-button>
+                <div class="flex flex-wrap items-center gap-3">
+                  <app-button (click)="applyAsCandidate()">Apply for this role</app-button>
+                  <app-button
+                    variant="secondary"
+                    [loading]="follows.isPending(job()!.companyId)"
+                    (click)="toggleFollow()"
+                  >
+                    {{
+                      follows.isFollowing(job()!.companyId) ? 'Unfollow company' : 'Follow company'
+                    }}
+                  </app-button>
+                </div>
               } @else {
                 <p class="text-body-sm text-ink-muted">
                   You're signed in with a company account — applications are for candidates.
@@ -100,7 +111,9 @@ export class JobDetailPage {
   private readonly router = inject(Router);
   private readonly titleService = inject(Title);
   private readonly meta = inject(Meta);
+  private readonly toasts = inject(ToastService);
   protected readonly auth = inject(AuthService);
+  protected readonly follows = inject(FollowsStore);
 
   /** Route param via withComponentInputBinding. */
   readonly id = input.required<string>();
@@ -125,6 +138,13 @@ export class JobDetailPage {
     effect(() => {
       this.id();
       untracked(() => void this.load());
+    });
+
+    // Candidates need the follow list to render the follow/unfollow state.
+    effect(() => {
+      if (this.auth.user()?.role === 'Candidate' && !this.follows.loaded()) {
+        untracked(() => void this.follows.load().catch(() => undefined));
+      }
     });
 
     // SEO: meaningful title + description per job. Full SSR is a documented
@@ -162,5 +182,24 @@ export class JobDetailPage {
 
   protected applyAsCandidate(): void {
     void this.router.navigate(['/candidate/apply', this.id()]);
+  }
+
+  protected async toggleFollow(): Promise<void> {
+    const companyId = this.job()?.companyId;
+    if (!companyId) {
+      return;
+    }
+    const following = this.follows.isFollowing(companyId);
+    try {
+      if (following) {
+        await this.follows.unfollow(companyId);
+        this.toasts.show('Company unfollowed', 'info');
+      } else {
+        await this.follows.follow(companyId);
+        this.toasts.show('Company followed', 'success');
+      }
+    } catch {
+      this.toasts.show('Could not update the follow. Try again.', 'error');
+    }
   }
 }

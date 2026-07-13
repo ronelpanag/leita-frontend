@@ -11,4 +11,9 @@ export const CANDIDATE_ROUTES: Routes = [
     loadComponent: () => import('./apply-page').then((m) => m.ApplyPage),
     title: 'Apply — Leita',
   },
+  {
+    path: 'following',
+    loadComponent: () => import('./following-page').then((m) => m.FollowingPage),
+    title: 'Companies you follow — Leita',
+  },
 ];

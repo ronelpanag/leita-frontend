@@ -4,4 +4,5 @@ export * from './api/api-types';
 export { authGuard } from './auth/auth-guard';
 export { authInterceptor } from './auth/auth-interceptor';
 export { AuthService, type AuthUser } from './auth/auth-service';
+export { FollowsStore } from './candidate/follows-store';
 export { roleGuard } from './auth/role-guard';
