@@ -80,6 +80,6 @@ describe('CandidateHomePage', () => {
   it('invites the candidate to browse roles when there are no applications', async () => {
     await renderHome([]);
     expect(screen.getByText('No applications yet')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Browse open roles' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Browse open roles' })).toBeTruthy();
   });
 });

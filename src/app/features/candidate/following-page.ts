@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FollowsStore } from '@core';
-import { Button, EmptyState, Spinner, ToastService } from '@shared';
+import { Button, ButtonLink, EmptyState, Spinner, ToastService } from '@shared';
 
 @Component({
   selector: 'app-following-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, EmptyState, RouterLink, Spinner],
+  imports: [Button, ButtonLink, EmptyState, RouterLink, Spinner],
   template: `
     <div class="mx-auto w-full max-w-3xl px-gutter py-section">
       <a routerLink="/candidate" class="font-mono text-caption text-spruce-700 hover:underline">
@@ -31,7 +31,7 @@ import { Button, EmptyState, Spinner, ToastService } from '@shared';
             title="You're not following anyone yet"
             description="Follow companies from their job postings to keep an eye on who's hiring."
           >
-            <a routerLink="/jobs"><app-button variant="secondary">Browse open roles</app-button></a>
+            <app-button-link to="/jobs" variant="secondary">Browse open roles</app-button-link>
           </app-empty-state>
         } @else {
           <ul class="flex flex-col gap-3">

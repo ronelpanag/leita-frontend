@@ -6,3 +6,4 @@ export { authInterceptor } from './auth/auth-interceptor';
 export { AuthService, type AuthUser } from './auth/auth-service';
 export { FollowsStore } from './candidate/follows-store';
 export { roleGuard } from './auth/role-guard';
+export { unsavedChangesGuard, type HasUnsavedChanges } from './routing/unsaved-changes-guard';

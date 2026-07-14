@@ -64,7 +64,9 @@ let nextId = 0;
 })
 export class TextInput implements ControlValueAccessor {
   readonly label = input.required<string>();
-  readonly type = input<'text' | 'email' | 'password' | 'tel' | 'url' | 'search'>('text');
+  readonly type = input<
+    'text' | 'email' | 'password' | 'tel' | 'url' | 'search' | 'datetime-local'
+  >('text');
   readonly placeholder = input('');
   readonly hint = input('');
   readonly error = input('');

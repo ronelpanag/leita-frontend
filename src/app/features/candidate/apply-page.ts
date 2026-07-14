@@ -9,15 +9,24 @@ import {
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { ApiClient, type JobPostingDetail } from '@core';
-import { Button, Card, EmptyState, Spinner, TextArea, ToastService } from '@shared';
+import { ApiClient, type HasUnsavedChanges, type JobPostingDetail } from '@core';
+import { Button, ButtonLink, Card, EmptyState, Spinner, TextArea, ToastService } from '@shared';
 import { firstValueFrom } from 'rxjs';
 
 /** Application submission flow, reached from a job detail page's Apply button. */
 @Component({
   selector: 'app-apply-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Card, EmptyState, ReactiveFormsModule, RouterLink, Spinner, TextArea],
+  imports: [
+    Button,
+    ButtonLink,
+    Card,
+    EmptyState,
+    ReactiveFormsModule,
+    RouterLink,
+    Spinner,
+    TextArea,
+  ],
   template: `
     <div class="mx-auto w-full max-w-2xl px-gutter py-section">
       @if (loading()) {
@@ -36,7 +45,7 @@ import { firstValueFrom } from 'rxjs';
           title="This role is no longer open"
           description="The posting closed before you could apply. More roles are waiting on the board."
         >
-          <a routerLink="/jobs"><app-button variant="secondary">Browse open roles</app-button></a>
+          <app-button-link to="/jobs" variant="secondary">Browse open roles</app-button-link>
         </app-empty-state>
       } @else {
         <a
@@ -72,9 +81,7 @@ import { firstValueFrom } from 'rxjs';
             }
             <div class="flex items-center gap-3">
               <app-button type="submit" [loading]="submitting()">Submit application</app-button>
-              <a [routerLink]="['/jobs', jobId()]">
-                <app-button variant="ghost">Cancel</app-button>
-              </a>
+              <app-button-link [to]="['/jobs', jobId()]" variant="ghost">Cancel</app-button-link>
             </div>
           </form>
         </app-card>
@@ -82,7 +89,9 @@ import { firstValueFrom } from 'rxjs';
     </div>
   `,
 })
-export class ApplyPage {
+export class ApplyPage implements HasUnsavedChanges {
+  private submitted = false;
+
   private readonly api = inject(ApiClient);
   private readonly router = inject(Router);
   private readonly toasts = inject(ToastService);
@@ -102,6 +111,10 @@ export class ApplyPage {
       this.jobId();
       untracked(() => void this.loadJob());
     });
+  }
+
+  hasUnsavedChanges(): boolean {
+    return !this.submitted && this.coverLetter.dirty && this.coverLetter.value.trim() !== '';
   }
 
   protected async loadJob(): Promise<void> {
@@ -127,6 +140,7 @@ export class ApplyPage {
           coverLetter: this.coverLetter.value.trim() || null,
         }),
       );
+      this.submitted = true;
       this.toasts.show('Application submitted', 'success');
       await this.router.navigateByUrl('/candidate');
     } catch {

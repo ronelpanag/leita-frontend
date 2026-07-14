@@ -32,7 +32,25 @@ application belongs to, so today it resolves titles with one extra
 breaks for postings a company later deletes. Adding `jobTitle` (and
 ideally `companyName`) to `ApplicationDto` removes the fan-out.
 
-## 4. SSR / prerendering for job detail SEO (noted, not urgent)
+## 4. Company postings list + edit endpoint (Phase 6)
+
+The company dashboard needs `GET /api/company/jobs` (all of the caller's
+postings, drafts included). Today the frontend reconstructs the list from the
+_public_ board filtered by `companyId` — drafts from earlier sessions are
+invisible and closed postings drop off after a reload. There is also **no
+edit endpoint** (`PUT /api/company/jobs/{id}`), so the brief's "edit" action
+is not implemented rather than faked. Application counts also need one call
+per posting (`GET /jobs/{id}/applications`) — a `applicationCount` on the
+list DTO would remove that N+1.
+
+## 5. Candidate identity in company-facing `ApplicationDto` (Phase 6)
+
+Pipeline cards can only show `Candidate 349d15d3` — the DTO carries
+`candidateId` but no display name (and no cover letter). Recruiters need
+the name; add `candidateDisplayName` (and consider `coverLetter`) to the
+DTO returned by `GET /api/company/jobs/{id}/applications`.
+
+## 6. SSR / prerendering for job detail SEO (noted, not urgent)
 
 Job detail pages set `<title>` and `meta description` at runtime. Crawlers
 that execute JS see them; plain-HTML crawlers do not. If organic search

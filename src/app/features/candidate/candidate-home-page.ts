@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ApiClient, AuthService, type Application, type PipelineStage } from '@core';
-import { Badge, Button, EmptyState, Spinner, type BadgeTone } from '@shared';
+import { Badge, Button, ButtonLink, EmptyState, Spinner, type BadgeTone } from '@shared';
 import { firstValueFrom } from 'rxjs';
 
 interface ApplicationRow {
@@ -28,7 +28,7 @@ const interviewFormat = new Intl.DateTimeFormat(undefined, {
 @Component({
   selector: 'app-candidate-home-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Badge, Button, EmptyState, RouterLink, Spinner],
+  imports: [Badge, Button, ButtonLink, EmptyState, RouterLink, Spinner],
   template: `
     <div class="mx-auto w-full max-w-3xl px-gutter py-section">
       <header class="flex flex-wrap items-end justify-between gap-4">
@@ -64,7 +64,7 @@ const interviewFormat = new Intl.DateTimeFormat(undefined, {
             title="No applications yet"
             description="Roles you apply to appear here with their place on the hiring trail."
           >
-            <a routerLink="/jobs"><app-button variant="secondary">Browse open roles</app-button></a>
+            <app-button-link to="/jobs" variant="secondary">Browse open roles</app-button-link>
           </app-empty-state>
         } @else {
           <p class="text-body-sm text-ink-muted">{{ rows().length }} applications</p>

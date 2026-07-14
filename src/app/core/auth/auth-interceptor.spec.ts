@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from './auth-service';
-import { CANDIDATE_JWT } from './auth-service.spec';
+import { CANDIDATE_JWT } from './testing/fake-tokens';
 import { authInterceptor } from './auth-interceptor';
 
 describe('authInterceptor', () => {

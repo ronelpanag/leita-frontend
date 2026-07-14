@@ -8,7 +8,7 @@ import {
   provideRouter,
 } from '@angular/router';
 import { AuthService } from './auth-service';
-import { CANDIDATE_JWT } from './auth-service.spec';
+import { CANDIDATE_JWT } from './testing/fake-tokens';
 import { authGuard } from './auth-guard';
 import { roleGuard } from './role-guard';
 

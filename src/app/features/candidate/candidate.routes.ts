@@ -1,4 +1,5 @@
 import type { Routes } from '@angular/router';
+import { unsavedChangesGuard } from '@core';
 
 export const CANDIDATE_ROUTES: Routes = [
   {
@@ -8,6 +9,7 @@ export const CANDIDATE_ROUTES: Routes = [
   },
   {
     path: 'apply/:jobId',
+    canDeactivate: [unsavedChangesGuard],
     loadComponent: () => import('./apply-page').then((m) => m.ApplyPage),
     title: 'Apply — Leita',
   },

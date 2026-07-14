@@ -1,6 +1,7 @@
 // Design system barrel — the only sanctioned import path for shared UI.
 export { Badge, type BadgeTone } from './components/badge/badge';
 export { Button, type ButtonSize, type ButtonVariant } from './components/button/button';
+export { ButtonLink } from './components/button/button-link';
 export { Card } from './components/card/card';
 export { EmptyState } from './components/empty-state/empty-state';
 export { TextInput } from './components/input/text-input';
