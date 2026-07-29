@@ -1,0 +1,72 @@
+import { ActivatedRoute, Router, provideRouter } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
+import { render, screen, waitFor } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
+import { AuthService } from '@core';
+import { LoginPage } from './login-page';
+
+function setup(returnTo: string | null, authOverrides: object = {}) {
+  const auth = {
+    login: vi.fn().mockResolvedValue(undefined),
+    homeUrl: () => '/candidate',
+    ...authOverrides,
+  };
+  return render(LoginPage, {
+    providers: [
+      provideRouter([]),
+      { provide: AuthService, useValue: auth },
+      {
+        provide: ActivatedRoute,
+        useValue: { snapshot: { queryParamMap: new Map([['returnTo', returnTo]]) } },
+      },
+    ],
+  }).then((view) => ({ auth, ...view }));
+}
+
+describe('LoginPage', () => {
+  it('validates required fields before calling the API', async () => {
+    const user = userEvent.setup();
+    const { auth } = await setup(null);
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+    expect(auth.login).not.toHaveBeenCalled();
+    expect(screen.getByText('Enter the email you registered with.')).toBeTruthy();
+  });
+
+  it('logs in and returns to the requested url', async () => {
+    const user = userEvent.setup();
+    const { auth } = await setup('/jobs/job-1');
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    await user.type(screen.getByLabelText(/Email/), 'nora@example.no');
+    await user.type(screen.getByLabelText(/Password/), 'Passw0rd!');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    await waitFor(() => expect(auth.login).toHaveBeenCalledWith('nora@example.no', 'Passw0rd!'));
+    expect(navigate).toHaveBeenCalledWith('/jobs/job-1');
+  });
+
+  it('falls back to the role home when there is no returnTo', async () => {
+    const user = userEvent.setup();
+    await setup(null);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    await user.type(screen.getByLabelText(/Email/), 'nora@example.no');
+    await user.type(screen.getByLabelText(/Password/), 'Passw0rd!');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/candidate'));
+  });
+
+  it('shows an error when the credentials are rejected', async () => {
+    const user = userEvent.setup();
+    await setup(null, { login: vi.fn().mockRejectedValue(new Error('401')) });
+
+    await user.type(screen.getByLabelText(/Email/), 'nora@example.no');
+    await user.type(screen.getByLabelText(/Password/), 'wrong');
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/did not match/)).toBeTruthy();
+    });
+  });
+});

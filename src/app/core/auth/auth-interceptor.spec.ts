@@ -104,6 +104,30 @@ describe('authInterceptor', () => {
     });
   });
 
+  it('restores a session at bootstrap with the interceptor installed', async () => {
+    // Regression: starting the restore from AuthService's field initializer
+    // made the interceptor's inject(AuthService) a circular dependency
+    // (NG0200), so every reload silently logged the user out. The restore is
+    // lazy now, and this test is the one that fails if it moves back.
+    sessionStorage.setItem('leita.refreshToken', 'refresh-from-last-visit');
+
+    const auth = TestBed.inject(AuthService);
+    const readyPromise = auth.ready;
+
+    const request = controller.expectOne('/api/auth/refresh');
+    expect(request.request.body).toEqual({ refreshToken: 'refresh-from-last-visit' });
+    request.flush({
+      accessToken: CANDIDATE_JWT,
+      accessTokenExpiresAtUtc: new Date().toISOString(),
+      refreshToken: 'refresh-rotated',
+    });
+    await readyPromise;
+
+    expect(auth.isAuthenticated()).toBe(true);
+    expect(auth.user()?.role).toBe('Candidate');
+    expect(sessionStorage.getItem('leita.refreshToken')).toBe('refresh-rotated');
+  });
+
   it('does not try to refresh when the login itself returns 401', async () => {
     const auth = TestBed.inject(AuthService);
     const attempt = auth.login('nora@example.no', 'wrong');

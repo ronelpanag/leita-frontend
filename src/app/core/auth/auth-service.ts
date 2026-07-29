@@ -49,8 +49,24 @@ export class AuthService {
     }
   });
 
-  /** Resolves once the initial session restore (if any) has finished. */
-  readonly ready: Promise<void> = this.restoreSession();
+  private restorePromise: Promise<void> | null = null;
+
+  /**
+   * Resolves once the initial session restore (if any) has finished.
+   *
+   * Deliberately lazy: kicking the restore off from a field initializer would
+   * issue an HTTP call while this service is still being constructed, and
+   * `authInterceptor` injects AuthService — Angular reports that as a circular
+   * dependency (NG0200), the refresh fails, and every reload silently logs the
+   * user out. Starting on first access means the instance is fully constructed
+   * by the time the interceptor asks for it. `provideAppInitializer` in
+   * app.config.ts touches this during bootstrap, so the restore still happens
+   * before the first route renders.
+   */
+  get ready(): Promise<void> {
+    this.restorePromise ??= this.restoreSession();
+    return this.restorePromise;
+  }
 
   async login(email: string, password: string): Promise<void> {
     this.applyTokens(await firstValueFrom(this.api.login(email, password)));
@@ -80,12 +96,17 @@ export class AuthService {
     this.userSignal.set(null);
     this.follows.reset();
     sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    // There is nothing left to restore; keep `ready` from starting one later.
+    this.restorePromise ??= Promise.resolve();
   }
 
   private applyTokens(tokens: AuthResponse): void {
     this.accessTokenSignal.set(tokens.accessToken);
     this.userSignal.set(decodeUser(tokens.accessToken));
     sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    // An explicit login/register settles the session: guards awaiting `ready`
+    // must not kick off a redundant restore for the session we just created.
+    this.restorePromise ??= Promise.resolve();
   }
 
   private async restoreSession(): Promise<void> {

@@ -1,5 +1,16 @@
 # Auth token storage — current tradeoff
 
+> **Backend status (2026-07-12): both flags are resolved.** The refresh token
+> now also ships as an `HttpOnly` cookie (`leita_refresh`, `Path=/api/auth`,
+> `SameSite=Lax`, `Secure` outside dev) set by login/refresh/register;
+> `/api/auth/refresh` works cookie-only (empty body, `withCredentials: true`),
+> a body token still wins for this sessionStorage client; `/api/auth/logout`
+> revokes server-side and clears the cookie. CORS is config-driven
+> (`Cors:AllowedOrigins`, dev allows `http://localhost:4200`) with
+> `AllowCredentials`. Migration steps + cleanup contract: see
+> `docs/auth-token-storage.md` in the **backend** repo. The sections below
+> describe the pre-cookie state and remain until the frontend migrates.
+
 ## What the backend provides today
 
 `POST /api/auth/login` and `/api/auth/refresh` return **both** tokens in the

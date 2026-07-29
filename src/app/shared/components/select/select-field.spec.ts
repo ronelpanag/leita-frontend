@@ -52,4 +52,26 @@ describe('SelectField', () => {
     expect(placeholder.disabled).toBe(true);
     expect(placeholder.value).toBe('');
   });
+
+  it('reflects a programmatic value and a disabled form control', async () => {
+    const { fixture } = await render(Host);
+    fixture.componentInstance.control.setValue('offer');
+    fixture.detectChanges();
+    expect((screen.getByLabelText('Stage') as HTMLSelectElement).value).toBe('offer');
+
+    fixture.componentInstance.control.disable();
+    fixture.detectChanges();
+    expect((screen.getByLabelText('Stage') as HTMLSelectElement).disabled).toBe(true);
+  });
+
+  it('surfaces an inline error via aria-describedby', async () => {
+    await render(
+      `<app-select-field label="Stage" [options]="options" [error]="'Pick a stage.'" />`,
+      { imports: [SelectField], componentProperties: { options: STAGES } },
+    );
+    const select = screen.getByLabelText('Stage');
+    expect(select.getAttribute('aria-invalid')).toBe('true');
+    const describedBy = select.getAttribute('aria-describedby');
+    expect(document.getElementById(describedBy as string)?.textContent).toContain('Pick a stage.');
+  });
 });

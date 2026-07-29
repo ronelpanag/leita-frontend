@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from './auth-service';
-import { CANDIDATE_JWT, COMPANY_JWT } from './testing/fake-tokens';
+import { CANDIDATE_JWT, COMPANY_JWT, fakeJwt } from './testing/fake-tokens';
 
 describe('AuthService', () => {
   beforeEach(() => {
@@ -105,7 +105,8 @@ describe('AuthService', () => {
   it('restores the session on construction when a refresh token survives reload', async () => {
     sessionStorage.setItem('leita.refreshToken', 'refresh-from-last-visit');
 
-    const auth = TestBed.inject(AuthService); // construction kicks off restore
+    const auth = TestBed.inject(AuthService);
+    const readyPromise = auth.ready; // touching `ready` kicks off the restore
     const http = TestBed.inject(HttpTestingController);
     const request = http.expectOne('/api/auth/refresh');
     expect(request.request.body).toEqual({ refreshToken: 'refresh-from-last-visit' });
@@ -114,7 +115,7 @@ describe('AuthService', () => {
       accessTokenExpiresAtUtc: new Date().toISOString(),
       refreshToken: 'refresh-rotated',
     });
-    await auth.ready;
+    await readyPromise;
 
     expect(auth.isAuthenticated()).toBe(true);
     expect(auth.user()?.role).toBe('Candidate');
@@ -125,11 +126,44 @@ describe('AuthService', () => {
     sessionStorage.setItem('leita.refreshToken', 'refresh-expired');
 
     const auth = TestBed.inject(AuthService);
+    const readyPromise = auth.ready;
     const http = TestBed.inject(HttpTestingController);
     http.expectOne('/api/auth/refresh').flush(null, { status: 401, statusText: 'Unauthorized' });
-    await auth.ready;
+    await readyPromise;
 
     expect(auth.isAuthenticated()).toBe(false);
     expect(sessionStorage.getItem('leita.refreshToken')).toBeNull();
+  });
+
+  it('treats a malformed token as an unauthenticated session', async () => {
+    const auth = TestBed.inject(AuthService);
+    const http = TestBed.inject(HttpTestingController);
+
+    const login = auth.login('nora@example.no', 'pw');
+    http.expectOne('/api/auth/login').flush({
+      accessToken: 'not-a-jwt',
+      accessTokenExpiresAtUtc: new Date().toISOString(),
+      refreshToken: 'refresh-1',
+    });
+    await login;
+
+    // The access token is still held, but no user could be decoded.
+    expect(auth.user()).toBeNull();
+    expect(auth.homeUrl()).toBe('/jobs');
+  });
+
+  it('ignores a token whose role is not a Leita role', async () => {
+    const auth = TestBed.inject(AuthService);
+    const http = TestBed.inject(HttpTestingController);
+
+    const login = auth.login('someone@example.no', 'pw');
+    http.expectOne('/api/auth/login').flush({
+      accessToken: fakeJwt({ email: 'someone@example.no', role: 'Wizard' }),
+      accessTokenExpiresAtUtc: new Date().toISOString(),
+      refreshToken: 'refresh-1',
+    });
+    await login;
+
+    expect(auth.user()).toBeNull();
   });
 });
