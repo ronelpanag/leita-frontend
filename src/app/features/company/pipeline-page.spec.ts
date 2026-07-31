@@ -11,7 +11,11 @@ const APPLICATIONS: readonly Application[] = [
   {
     id: 'app-1',
     jobPostingId: 'job-1',
+    jobTitle: 'Frontend Engineer',
+    companyName: 'Fjellheim AS',
     candidateId: 'c0ffee00-aaaa-0000-0000-000000000001',
+    candidateDisplayName: 'Nora Berg',
+    coverLetter: 'I know the trail.',
     currentStage: 'Applied',
     submittedAtUtc: '2026-07-01T09:00:00Z',
     interviews: [],
@@ -19,7 +23,11 @@ const APPLICATIONS: readonly Application[] = [
   {
     id: 'app-2',
     jobPostingId: 'job-1',
+    jobTitle: 'Frontend Engineer',
+    companyName: 'Fjellheim AS',
     candidateId: 'c0ffee00-bbbb-0000-0000-000000000002',
+    candidateDisplayName: 'Bjørn Aas',
+    coverLetter: null,
     currentStage: 'Interview',
     submittedAtUtc: '2026-07-02T09:00:00Z',
     interviews: [],
@@ -38,7 +46,7 @@ async function renderPipeline(overrides: object = {}) {
     providers: [provideRouter([]), { provide: ApiClient, useValue: api }],
   });
   await waitFor(() => {
-    expect(screen.getAllByText(/Candidate c0ffee00/).length).toBe(2);
+    expect(screen.getByText('Nora Berg')).toBeTruthy();
   });
   return { api, ...view };
 }
@@ -50,7 +58,8 @@ function column(stage: string) {
 describe('PipelinePage', () => {
   it('renders one column per stage with correct counts', async () => {
     await renderPipeline();
-    expect(within(column('Applied')).getByText(/Candidate c0ffee00/)).toBeTruthy();
+    expect(within(column('Applied')).getByText('Nora Berg')).toBeTruthy();
+    expect(within(column('Applied')).getByText('I know the trail.')).toBeTruthy();
     expect(column('Applied').getAttribute('aria-label')).toBe('Applied — 1 application');
     expect(column('Screening').getAttribute('aria-label')).toBe('Screening — 0 applications');
     expect(column('Interview').getAttribute('aria-label')).toBe('Interview — 1 application');

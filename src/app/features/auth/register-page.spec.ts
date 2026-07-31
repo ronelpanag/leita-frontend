@@ -19,7 +19,7 @@ function setup(authOverrides: object = {}) {
 
 describe('RegisterPage', () => {
   it('registers a candidate by default', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { auth } = await setup();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
 
@@ -39,7 +39,7 @@ describe('RegisterPage', () => {
   });
 
   it('switches to the company form and requires a company name', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { auth } = await setup();
     await user.click(screen.getByRole('radio', { name: 'Hiring' }));
 
@@ -61,7 +61,7 @@ describe('RegisterPage', () => {
   });
 
   it('surfaces a friendly error when registration fails', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await setup({ registerCandidate: vi.fn().mockRejectedValue(new Error('422')) });
 
     await user.type(screen.getByLabelText(/Full name/), 'Nora');

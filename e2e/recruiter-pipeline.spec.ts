@@ -32,8 +32,13 @@ test('recruiter moves an application and the move persists', async ({ page, requ
   await expect(page.getByText('Published', { exact: true })).toBeVisible();
 
   // A candidate applies (via the API, using a fresh registration).
+  const candidateName = `Nora ${Date.now()}`;
   const reg = await request.post('/api/candidate/register', {
-    data: { displayName: 'Nora', email: `nora+${Date.now()}@example.no`, password: 'Passw0rd!x' },
+    data: {
+      displayName: candidateName,
+      email: `nora+${Date.now()}@example.no`,
+      password: 'Passw0rd!x',
+    },
   });
   const { tokens } = await reg.json();
   const jobs = await (await request.get('/api/public/jobs?page=1&pageSize=100')).json();
@@ -47,7 +52,7 @@ test('recruiter moves an application and the move persists', async ({ page, requ
   // Open the pipeline and move the card with the keyboard-accessible button.
   await page.getByRole('link', { name: 'View pipeline' }).click();
   const applied = page.getByRole('listitem', { name: /^Applied/ });
-  await expect(applied).toContainText('Candidate');
+  await expect(applied).toContainText(candidateName);
   await page.getByRole('button', { name: '→ Screening' }).click();
 
   const screening = page.getByRole('listitem', { name: /^Screening — 1 application/ });

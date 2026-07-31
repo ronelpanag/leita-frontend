@@ -12,7 +12,7 @@ describe('authInterceptor', () => {
   let controller: HttpTestingController;
 
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -26,7 +26,7 @@ describe('authInterceptor', () => {
 
   afterEach(() => {
     controller.verify();
-    sessionStorage.clear();
+    localStorage.clear();
   });
 
   async function login(): Promise<void> {
@@ -35,7 +35,7 @@ describe('authInterceptor', () => {
     controller.expectOne('/api/auth/login').flush({
       accessToken: CANDIDATE_JWT,
       accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'refresh-1',
+      refreshToken: 'rotated-server-side',
     });
     await request;
   }
@@ -66,11 +66,13 @@ describe('authInterceptor', () => {
       .flush(null, { status: 401, statusText: 'Unauthorized' });
 
     const refresh = controller.expectOne('/api/auth/refresh');
-    expect(refresh.request.body).toEqual({ refreshToken: 'refresh-1' });
+    // The refresh token travels as an httpOnly cookie, never in the body.
+    expect(refresh.request.body).toBeNull();
+    expect(refresh.request.withCredentials).toBe(true);
     refresh.flush({
       accessToken: CANDIDATE_JWT,
       accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'refresh-2',
+      refreshToken: 'rotated-again',
     });
     // The retry is issued after the refresh promise resolves (a microtask).
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -80,7 +82,6 @@ describe('authInterceptor', () => {
     retried.flush([{ id: 'a1' }]);
 
     await expect(call).resolves.toEqual([{ id: 'a1' }]);
-    expect(sessionStorage.getItem('leita.refreshToken')).toBe('refresh-2');
   });
 
   it('logs out and redirects to login when the refresh also fails', async () => {
@@ -98,6 +99,8 @@ describe('authInterceptor', () => {
       .flush(null, { status: 401, statusText: 'Unauthorized' });
 
     await expect(call).rejects.toBeTruthy();
+    // Losing the session also revokes it server-side.
+    controller.expectOne('/api/auth/logout').flush(null);
     expect(auth.isAuthenticated()).toBe(false);
     expect(navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnTo: expect.any(String) },
@@ -109,23 +112,22 @@ describe('authInterceptor', () => {
     // made the interceptor's inject(AuthService) a circular dependency
     // (NG0200), so every reload silently logged the user out. The restore is
     // lazy now, and this test is the one that fails if it moves back.
-    sessionStorage.setItem('leita.refreshToken', 'refresh-from-last-visit');
+    localStorage.setItem('leita.hasSession', '1');
 
     const auth = TestBed.inject(AuthService);
     const readyPromise = auth.ready;
 
     const request = controller.expectOne('/api/auth/refresh');
-    expect(request.request.body).toEqual({ refreshToken: 'refresh-from-last-visit' });
+    expect(request.request.withCredentials).toBe(true);
     request.flush({
       accessToken: CANDIDATE_JWT,
       accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'refresh-rotated',
+      refreshToken: 'rotated-server-side',
     });
     await readyPromise;
 
     expect(auth.isAuthenticated()).toBe(true);
     expect(auth.user()?.role).toBe('Candidate');
-    expect(sessionStorage.getItem('leita.refreshToken')).toBe('refresh-rotated');
   });
 
   it('does not try to refresh when the login itself returns 401', async () => {

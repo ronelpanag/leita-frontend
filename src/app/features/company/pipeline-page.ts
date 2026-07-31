@@ -101,9 +101,14 @@ const interviewFormat = new Intl.DateTimeFormat(undefined, {
                              shadow-none transition-colors hover:border-line-strong
                              active:cursor-grabbing"
                     >
-                      <p class="font-mono text-body-sm font-medium text-ink" translate="no">
-                        Candidate {{ shortId(application.candidateId) }}
+                      <p class="break-words text-body-sm font-medium text-ink">
+                        {{ application.candidateDisplayName ?? 'Candidate (name unavailable)' }}
                       </p>
+                      @if (application.coverLetter) {
+                        <p class="mt-1 line-clamp-3 text-caption text-ink-muted">
+                          {{ application.coverLetter }}
+                        </p>
+                      }
                       <p class="mt-1 font-mono text-caption text-ink-muted">
                         Applied {{ submittedLabel(application) }}
                       </p>
@@ -287,11 +292,6 @@ export class PipelinePage {
     } finally {
       this.scheduling.set(false);
     }
-  }
-
-  protected shortId(candidateId: string): string {
-    // The API sends no candidate name yet (docs/backend-follow-ups.md #6).
-    return candidateId.slice(0, 8);
   }
 
   protected submittedLabel(application: Application): string {

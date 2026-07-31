@@ -59,13 +59,23 @@ const STATUS_TONES: Record<JobPostingStatus, BadgeTone> = {
                   <p class="break-words text-body font-medium text-ink">{{ row.title }}</p>
                   <p class="mt-0.5 font-mono text-caption text-ink-muted">
                     {{ row.location || 'Location not specified' }}
-                    · {{ row.applicationCount === null ? '—' : row.applicationCount }} applications
+                    · {{ row.applicationCount }}
+                    {{ row.applicationCount === 1 ? 'application' : 'applications' }}
                   </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                   <app-badge [tone]="statusTone(row.status)" [waymark]="true">
                     {{ row.status }}
                   </app-badge>
+                  @if (row.status !== 'Closed') {
+                    <app-button-link
+                      [to]="['/company/jobs', row.id, 'edit']"
+                      variant="ghost"
+                      size="sm"
+                    >
+                      Edit
+                    </app-button-link>
+                  }
                   @if (row.status === 'Draft') {
                     <app-button
                       size="sm"
@@ -105,10 +115,6 @@ const STATUS_TONES: Record<JobPostingStatus, BadgeTone> = {
               </li>
             }
           </ul>
-          <p class="mt-4 text-caption text-ink-muted">
-            Drafts created in earlier sessions are not listed yet — the API has no company-postings
-            endpoint (see docs/backend-follow-ups.md).
-          </p>
         }
       </div>
 

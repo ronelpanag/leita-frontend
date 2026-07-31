@@ -21,13 +21,6 @@ const JOBS: readonly JobPostingSummary[] = [
     publishedAtUtc: '2026-07-02T09:00:00Z',
     promoted: true,
   },
-  {
-    id: 'job-3',
-    companyId: 'co-2',
-    title: 'Backend Engineer',
-    location: null,
-    publishedAtUtc: '2026-07-03T09:00:00Z',
-  },
 ];
 
 function pageOf(items: readonly JobPostingSummary[]): PagedResult<JobPostingSummary> {
@@ -48,9 +41,9 @@ async function renderBoard(items: readonly JobPostingSummary[] = JOBS) {
 describe('JobBoardPage', () => {
   it('lists open roles from the paged endpoint', async () => {
     const { api } = await renderBoard();
-    expect(api.getOpenJobs).toHaveBeenCalledWith(1, 20);
+    expect(api.getOpenJobs).toHaveBeenCalledWith(1, 20, '', '');
     expect(screen.getByText('Frontend Engineer')).toBeTruthy();
-    expect(screen.getByText('3 open roles')).toBeTruthy();
+    expect(screen.getByText('2 open roles')).toBeTruthy();
   });
 
   it('marks promoted postings as featured', async () => {
@@ -58,36 +51,48 @@ describe('JobBoardPage', () => {
     expect(screen.getByText('Featured')).toBeTruthy();
   });
 
-  it('filters by keyword, case-insensitively', async () => {
-    const user = userEvent.setup();
-    await renderBoard();
+  it('sends the keyword to the server rather than filtering locally', async () => {
+    const user = userEvent.setup({ delay: null });
+    const { api } = await renderBoard();
+    api.getOpenJobs.mockReturnValue(of(pageOf([JOBS[0]])));
+
     await user.type(screen.getByLabelText('Keyword'), 'engineer');
+
+    await waitFor(() => {
+      expect(api.getOpenJobs).toHaveBeenCalledWith(1, 20, 'engineer', '');
+    });
     await waitFor(() => {
       expect(screen.queryByText('Staff Designer')).toBeNull();
     });
-    expect(screen.getByText('Frontend Engineer')).toBeTruthy();
-    expect(screen.getByText('Backend Engineer')).toBeTruthy();
-    expect(screen.getByText('2 of 3 open roles match')).toBeTruthy();
+    expect(screen.getByText('1 open role match')).toBeTruthy();
   });
 
-  it('filters by location and treats missing locations as non-matching', async () => {
-    const user = userEvent.setup();
-    await renderBoard();
+  it('sends the location filter to the server', async () => {
+    const user = userEvent.setup({ delay: null });
+    const { api } = await renderBoard();
+    api.getOpenJobs.mockReturnValue(of(pageOf([JOBS[0]])));
+
     await user.type(screen.getByLabelText('Location'), 'oslo');
+
     await waitFor(() => {
-      expect(screen.queryByText('Backend Engineer')).toBeNull();
+      expect(api.getOpenJobs).toHaveBeenCalledWith(1, 20, '', 'oslo');
     });
-    expect(screen.getByText('Frontend Engineer')).toBeTruthy();
   });
 
-  it('offers to clear filters when nothing matches', async () => {
-    const user = userEvent.setup();
-    await renderBoard();
+  it('offers to clear filters when the server returns nothing', async () => {
+    const user = userEvent.setup({ delay: null });
+    const { api } = await renderBoard();
+    api.getOpenJobs.mockReturnValue(of(pageOf([])));
+
     await user.type(screen.getByLabelText('Keyword'), 'astronaut');
+
     await waitFor(() => {
       expect(screen.getByText('No roles match your search')).toBeTruthy();
     });
+
+    api.getOpenJobs.mockReturnValue(of(pageOf(JOBS)));
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+
     await waitFor(() => {
       expect(screen.getByText('Frontend Engineer')).toBeTruthy();
     });

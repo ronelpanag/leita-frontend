@@ -60,15 +60,42 @@ function issue(email) {
   return { accessToken, accessTokenExpiresAtUtc: new Date(Date.now() + 900_000).toISOString(), refreshToken };
 }
 
-const json = (res, status, body) => {
-  res.writeHead(status, { 'content-type': 'application/json' });
+const REFRESH_COOKIE = 'leita_refresh';
+
+const readCookie = (req, name) =>
+  (req.headers.cookie ?? '')
+    .split(';')
+    .map((c) => c.trim().split('='))
+    .find(([k]) => k === name)?.[1] ?? null;
+
+const json = (res, status, body, cookie) => {
+  const headers = { 'content-type': 'application/json' };
+  if (cookie !== undefined) headers['set-cookie'] = cookie;
+  res.writeHead(status, headers);
   res.end(JSON.stringify(body));
 };
+
+const refreshCookie = (token) =>
+  token === null
+    ? REFRESH_COOKIE + '=; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=0'
+    : REFRESH_COOKIE + '=' + token + '; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=604800';
 const noContent = (res) => {
   res.writeHead(204);
   res.end();
 };
 const summary = ({ description, status, createdAtUtc, closedAtUtc, ...rest }) => rest;
+
+/** Denormalizes the names the API now sends on every application row. */
+const enrich = (app) => {
+  const posting = jobs.find((j) => j.id === app.jobPostingId);
+  const candidate = [...users.values()].find((u) => u.candidateId === app.candidateId);
+  return {
+    ...app,
+    jobTitle: posting?.title ?? null,
+    companyName: posting ? (companies.get(posting.companyId)?.name ?? null) : null,
+    candidateDisplayName: candidate?.displayName ?? null,
+  };
+};
 
 createServer((req, res) => {
   let raw = '';
@@ -81,24 +108,41 @@ createServer((req, res) => {
     if (route === 'POST /api/auth/login') {
       const user = users.get(body.email);
       if (!user || user.password !== body.password) return json(res, 401, { title: 'Invalid credentials.' });
-      return json(res, 200, issue(body.email));
+      const tokens = issue(body.email);
+      return json(res, 200, tokens, refreshCookie(tokens.refreshToken));
     }
     if (route === 'POST /api/auth/refresh') {
-      const email = refreshTokens.get(body.refreshToken);
+      // A body token wins (legacy clients); otherwise the httpOnly cookie.
+      const supplied = body.refreshToken ?? readCookie(req, REFRESH_COOKIE);
+      const email = supplied ? refreshTokens.get(supplied) : null;
       if (!email) return json(res, 401, { title: 'Invalid or expired refresh token.' });
-      refreshTokens.delete(body.refreshToken);
-      return json(res, 200, issue(email));
+      refreshTokens.delete(supplied);
+      const tokens = issue(email);
+      return json(res, 200, tokens, refreshCookie(tokens.refreshToken));
+    }
+    if (route === 'POST /api/auth/logout') {
+      const supplied = readCookie(req, REFRESH_COOKIE);
+      if (supplied) refreshTokens.delete(supplied);
+      res.writeHead(204, { 'set-cookie': refreshCookie(null) });
+      return res.end();
     }
     if (route === 'POST /api/candidate/register') {
       const candidateId = randomUUID();
-      users.set(body.email, { password: body.password, role: 'Candidate', candidateId });
-      return json(res, 201, { candidateId, tokens: issue(body.email) });
+      users.set(body.email, {
+        password: body.password,
+        role: 'Candidate',
+        candidateId,
+        displayName: body.displayName,
+      });
+      const tokens = issue(body.email);
+      return json(res, 201, { candidateId, tokens }, refreshCookie(tokens.refreshToken));
     }
     if (route === 'POST /api/company/register') {
       const companyId = randomUUID();
       companies.set(companyId, { id: companyId, name: body.companyName, description: body.description ?? null, website: body.website ?? null });
       users.set(body.email, { password: body.password, role: 'CompanyAdmin', companyId });
-      return json(res, 201, { companyId, tokens: issue(body.email) });
+      const tokens = issue(body.email);
+      return json(res, 201, { companyId, tokens }, refreshCookie(tokens.refreshToken));
     }
 
     // Public
@@ -108,7 +152,14 @@ createServer((req, res) => {
       return job ? json(res, 200, job) : json(res, 404, { title: 'Not found' });
     }
     if (req.method === 'GET' && req.url.startsWith('/api/public/jobs')) {
-      const published = jobs.filter((j) => j.status === 'Published').map(summary);
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const q = (params.get('q') ?? '').toLowerCase();
+      const loc = (params.get('location') ?? '').toLowerCase();
+      const published = jobs
+        .filter((j) => j.status === 'Published')
+        .filter((j) => !q || (j.title + ' ' + j.description).toLowerCase().includes(q))
+        .filter((j) => !loc || (j.location ?? '').toLowerCase().includes(loc))
+        .map(summary);
       return json(res, 200, { items: published, page: 1, pageSize: 20, totalCount: published.length, totalPages: 1 });
     }
 
@@ -116,13 +167,21 @@ createServer((req, res) => {
     const candidateId = claims?.['leita:candidate_id'];
     if (route === 'POST /api/candidate/applications') {
       if (!candidateId) return json(res, 401, { title: 'Unauthorized' });
-      const app = { id: randomUUID(), jobPostingId: body.jobPostingId, candidateId, currentStage: 'Applied', submittedAtUtc: new Date().toISOString(), interviews: [] };
+      const app = {
+        id: randomUUID(),
+        jobPostingId: body.jobPostingId,
+        candidateId,
+        currentStage: 'Applied',
+        coverLetter: body.coverLetter ?? null,
+        submittedAtUtc: new Date().toISOString(),
+        interviews: [],
+      };
       applications.push(app);
       return json(res, 201, { id: app.id });
     }
     if (route === 'GET /api/candidate/applications') {
       if (!candidateId) return json(res, 401, { title: 'Unauthorized' });
-      return json(res, 200, applications.filter((a) => a.candidateId === candidateId));
+      return json(res, 200, applications.filter((a) => a.candidateId === candidateId).map(enrich));
     }
     const followMatch = req.url.match(/^\/api\/candidate\/follows\/([0-9a-f-]+)$/);
     if (followMatch && (req.method === 'POST' || req.method === 'DELETE')) {
@@ -140,6 +199,35 @@ createServer((req, res) => {
 
     // Company
     const companyId = claims?.['leita:company_id'];
+    if (route === 'GET /api/company/jobs') {
+      if (!companyId) return json(res, 401, { title: 'Unauthorized' });
+      return json(
+        res,
+        200,
+        jobs
+          .filter((j) => j.companyId === companyId)
+          .map(({ id, title, location, status, createdAtUtc, publishedAtUtc, closedAtUtc }) => ({
+            id,
+            title,
+            location,
+            status,
+            createdAtUtc,
+            publishedAtUtc,
+            closedAtUtc,
+            applicationCount: applications.filter((a) => a.jobPostingId === id).length,
+          })),
+      );
+    }
+
+    const editMatch = req.url.match(/^\/api\/company\/jobs\/([0-9a-f-]+)$/);
+    if (req.method === 'PUT' && editMatch) {
+      const job = jobs.find((j) => j.id === editMatch[1]);
+      if (!job) return json(res, 404, { title: 'Not found' });
+      if (job.status === 'Closed') return json(res, 400, { title: 'Closed postings are immutable.' });
+      Object.assign(job, { title: body.title, description: body.description, location: body.location });
+      return noContent(res);
+    }
+
     if (route === 'POST /api/company/jobs') {
       if (!companyId) return json(res, 401, { title: 'Unauthorized' });
       const job = { id: randomUUID(), companyId, title: body.title, description: body.description, location: body.location, status: 'Draft', createdAtUtc: new Date().toISOString(), publishedAtUtc: null, closedAtUtc: null };
@@ -156,7 +244,7 @@ createServer((req, res) => {
     }
     const jobApps = req.url.match(/^\/api\/company\/jobs\/([0-9a-f-]+)\/applications$/);
     if (req.method === 'GET' && jobApps) {
-      return json(res, 200, applications.filter((a) => a.jobPostingId === jobApps[1]));
+      return json(res, 200, applications.filter((a) => a.jobPostingId === jobApps[1]).map(enrich));
     }
     const stage = req.url.match(/^\/api\/company\/applications\/([0-9a-f-]+)\/stage$/);
     if (req.method === 'POST' && stage) {

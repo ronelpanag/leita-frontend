@@ -16,13 +16,19 @@ export interface AuthUser {
   readonly companyId: string | null;
 }
 
-const REFRESH_TOKEN_KEY = 'leita.refreshToken';
+/**
+ * Non-sensitive hint that a refresh cookie should exist, so anonymous visitors
+ * to the public board don't pay for a doomed refresh round-trip on every load.
+ * It is only an optimisation: the cookie is the actual credential, and the API
+ * is the one that decides.
+ */
+const SESSION_HINT_KEY = 'leita.hasSession';
 
 /**
  * Holds the session. The access token lives in memory only (a signal); the
- * rotating refresh token is kept in sessionStorage so a page reload can
- * silently restore the session — see docs/auth-token-storage.md for the
- * tradeoff and the backend follow-up (httpOnly cookie refresh).
+ * rotating refresh token never reaches JavaScript at all — it is an httpOnly
+ * cookie set by the API on login/register and rotated on every refresh. See
+ * docs/auth-token-storage.md.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -82,41 +88,48 @@ export class AuthService {
     this.applyTokens(response.tokens);
   }
 
-  /** Exchanges the stored refresh token for a new pair. Throws if none or rejected. */
+  /** Exchanges the refresh cookie for a new pair. Rejects when the API declines. */
   async refresh(): Promise<void> {
-    const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
-    if (!refreshToken) {
-      throw new Error('No refresh token available.');
-    }
-    this.applyTokens(await firstValueFrom(this.api.refresh(refreshToken)));
+    this.applyTokens(await firstValueFrom(this.api.refresh()));
   }
 
+  /**
+   * Clears the local session and revokes the refresh token server-side. The
+   * local state is dropped first so the UI never lags behind the user's intent
+   * even if the network call fails.
+   */
   logout(): void {
-    this.accessTokenSignal.set(null);
-    this.userSignal.set(null);
-    this.follows.reset();
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-    // There is nothing left to restore; keep `ready` from starting one later.
-    this.restorePromise ??= Promise.resolve();
+    this.clearSession();
+    firstValueFrom(this.api.logout()).catch(() => undefined);
   }
 
   private applyTokens(tokens: AuthResponse): void {
     this.accessTokenSignal.set(tokens.accessToken);
     this.userSignal.set(decodeUser(tokens.accessToken));
-    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    localStorage.setItem(SESSION_HINT_KEY, '1');
     // An explicit login/register settles the session: guards awaiting `ready`
     // must not kick off a redundant restore for the session we just created.
     this.restorePromise ??= Promise.resolve();
   }
 
+  private clearSession(): void {
+    this.accessTokenSignal.set(null);
+    this.userSignal.set(null);
+    this.follows.reset();
+    localStorage.removeItem(SESSION_HINT_KEY);
+    // There is nothing left to restore; keep `ready` from starting one later.
+    this.restorePromise ??= Promise.resolve();
+  }
+
   private async restoreSession(): Promise<void> {
-    if (!sessionStorage.getItem(REFRESH_TOKEN_KEY)) {
+    if (localStorage.getItem(SESSION_HINT_KEY) === null) {
       return;
     }
     try {
       await this.refresh();
     } catch {
-      this.logout();
+      // The cookie is gone or expired; drop the hint so the next load is quiet.
+      this.clearSession();
     }
   }
 }

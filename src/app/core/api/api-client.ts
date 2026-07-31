@@ -5,6 +5,7 @@ import type {
   Application,
   AuthResponse,
   Company,
+  CompanyJobPosting,
   CreateJobPostingRequest,
   CreatedId,
   JobPostingDetail,
@@ -17,6 +18,7 @@ import type {
   RegisterCompanyResponse,
   ScheduleInterviewRequest,
   SubmitApplicationRequest,
+  UpdateJobPostingRequest,
 } from './api-types';
 
 /** Base URL for the Leita API. Dev serves through the Angular proxy (see proxy.conf.json). */
@@ -44,24 +46,42 @@ export class ApiClient {
     return this.http.post<AuthResponse>(
       `${this.baseUrl}/auth/login`,
       { email, password },
-      { context: skipRefresh() },
+      { context: skipRefresh(), withCredentials: true },
     );
   }
 
-  refresh(refreshToken: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(
-      `${this.baseUrl}/auth/refresh`,
-      { refreshToken },
-      { context: skipRefresh() },
-    );
+  /**
+   * Exchanges the httpOnly refresh cookie for a new token pair. Sends no body:
+   * the API reads the cookie, and rotates it on every call.
+   */
+  refresh(): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.baseUrl}/auth/refresh`, null, {
+      context: skipRefresh(),
+      withCredentials: true,
+    });
+  }
+
+  /** Revokes the refresh token server-side and clears the cookie. */
+  logout(): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/auth/logout`, null, {
+      context: skipRefresh(),
+      withCredentials: true,
+    });
   }
 
   // --- Public (/api/public) ---
 
-  getOpenJobs(page = 1, pageSize = 20): Observable<PagedResult<JobPostingSummary>> {
-    return this.http.get<PagedResult<JobPostingSummary>>(`${this.baseUrl}/public/jobs`, {
-      params: { page, pageSize },
-    });
+  /** `q` matches title and description, `location` matches location; both optional. */
+  getOpenJobs(
+    page = 1,
+    pageSize = 20,
+    q = '',
+    location = '',
+  ): Observable<PagedResult<JobPostingSummary>> {
+    let params: Record<string, string | number> = { page, pageSize };
+    if (q) params = { ...params, q };
+    if (location) params = { ...params, location };
+    return this.http.get<PagedResult<JobPostingSummary>>(`${this.baseUrl}/public/jobs`, { params });
   }
 
   getJob(id: string): Observable<JobPostingDetail> {
@@ -74,7 +94,7 @@ export class ApiClient {
     return this.http.post<RegisterCandidateResponse>(
       `${this.baseUrl}/candidate/register`,
       request,
-      { context: skipRefresh() },
+      { context: skipRefresh(), withCredentials: true },
     );
   }
 
@@ -103,11 +123,21 @@ export class ApiClient {
   registerCompany(request: RegisterCompanyRequest): Observable<RegisterCompanyResponse> {
     return this.http.post<RegisterCompanyResponse>(`${this.baseUrl}/company/register`, request, {
       context: skipRefresh(),
+      withCredentials: true,
     });
+  }
+
+  /** Every posting of the caller's company — drafts and closed included. */
+  getCompanyJobs(): Observable<readonly CompanyJobPosting[]> {
+    return this.http.get<readonly CompanyJobPosting[]>(`${this.baseUrl}/company/jobs`);
   }
 
   createJob(request: CreateJobPostingRequest): Observable<CreatedId> {
     return this.http.post<CreatedId>(`${this.baseUrl}/company/jobs`, request);
+  }
+
+  updateJob(id: string, request: UpdateJobPostingRequest): Observable<void> {
+    return this.http.put<void>(`${this.baseUrl}/company/jobs/${id}`, request);
   }
 
   publishJob(id: string): Observable<void> {

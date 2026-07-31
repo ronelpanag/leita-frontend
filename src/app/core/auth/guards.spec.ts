@@ -22,19 +22,19 @@ async function loginAsCandidate(): Promise<void> {
   http.expectOne('/api/auth/login').flush({
     accessToken: CANDIDATE_JWT,
     accessTokenExpiresAtUtc: new Date().toISOString(),
-    refreshToken: 'refresh-1',
+    refreshToken: 'rotated-server-side',
   });
   await login;
 }
 
 describe('authGuard', () => {
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
   });
-  afterEach(() => sessionStorage.clear());
+  afterEach(() => localStorage.clear());
 
   it('redirects anonymous users to login with a returnTo url', async () => {
     const result = await TestBed.runInInjectionContext(() => authGuard(route, state));
@@ -51,12 +51,12 @@ describe('authGuard', () => {
 
 describe('roleGuard', () => {
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
   });
-  afterEach(() => sessionStorage.clear());
+  afterEach(() => localStorage.clear());
 
   it('blocks a candidate from company routes, redirecting to their home', async () => {
     await loginAsCandidate();

@@ -14,6 +14,12 @@ export const COMPANY_ROUTES: Routes = [
     title: 'New job posting — Leita',
   },
   {
+    path: 'jobs/:id/edit',
+    canDeactivate: [unsavedChangesGuard],
+    loadComponent: () => import('./job-edit-page').then((m) => m.JobEditPage),
+    title: 'Edit job posting — Leita',
+  },
+  {
     path: 'jobs/:id/pipeline',
     loadComponent: () => import('./pipeline-page').then((m) => m.PipelinePage),
     title: 'Pipeline — Leita',

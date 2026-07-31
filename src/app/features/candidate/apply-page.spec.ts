@@ -45,7 +45,7 @@ describe('ApplyPage', () => {
   });
 
   it('submits the application with the cover letter and redirects to the dashboard', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { api } = await renderApply();
     const router = TestBed.inject(Router);
     const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
@@ -66,7 +66,7 @@ describe('ApplyPage', () => {
   });
 
   it('sends null when the cover letter is left empty', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { api } = await renderApply();
     vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
 
@@ -81,7 +81,7 @@ describe('ApplyPage', () => {
   });
 
   it('surfaces a useful error when the submission fails (e.g. duplicate)', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await renderApply({
       submitApplication: vi.fn().mockReturnValue(throwError(() => new Error('409'))),
     });

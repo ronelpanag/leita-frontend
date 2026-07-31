@@ -25,7 +25,7 @@ function setup(returnTo: string | null, authOverrides: object = {}) {
 
 describe('LoginPage', () => {
   it('validates required fields before calling the API', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { auth } = await setup(null);
     await user.click(screen.getByRole('button', { name: 'Log in' }));
     expect(auth.login).not.toHaveBeenCalled();
@@ -33,7 +33,7 @@ describe('LoginPage', () => {
   });
 
   it('logs in and returns to the requested url', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     const { auth } = await setup('/jobs/job-1');
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
 
@@ -46,7 +46,7 @@ describe('LoginPage', () => {
   });
 
   it('falls back to the role home when there is no returnTo', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await setup(null);
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
 
@@ -58,7 +58,7 @@ describe('LoginPage', () => {
   });
 
   it('shows an error when the credentials are rejected', async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
     await setup(null, { login: vi.fn().mockRejectedValue(new Error('401')) });
 
     await user.type(screen.getByLabelText(/Email/), 'nora@example.no');

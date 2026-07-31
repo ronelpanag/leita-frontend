@@ -8,7 +8,11 @@ const APPLICATIONS: readonly Application[] = [
   {
     id: 'app-1',
     jobPostingId: 'job-1',
+    jobTitle: 'Frontend Engineer',
+    companyName: 'Fjellheim AS',
     candidateId: 'c-1',
+    candidateDisplayName: 'Nora Berg',
+    coverLetter: null,
     currentStage: 'Interview',
     submittedAtUtc: '2026-07-01T09:00:00Z',
     interviews: [{ id: 'i-1', scheduledAtUtc: '2027-01-05T13:00:00Z', location: 'Teams' }],
@@ -16,7 +20,11 @@ const APPLICATIONS: readonly Application[] = [
   {
     id: 'app-2',
     jobPostingId: 'job-2',
+    jobTitle: 'Staff Designer',
+    companyName: 'Brevik Studio',
     candidateId: 'c-1',
+    candidateDisplayName: 'Nora Berg',
+    coverLetter: null,
     currentStage: 'Applied',
     submittedAtUtc: '2026-07-03T09:00:00Z',
     interviews: [],
@@ -33,14 +41,7 @@ const auth = {
 };
 
 async function renderHome(applications: readonly Application[] = APPLICATIONS) {
-  const api = {
-    getMyApplications: vi.fn().mockReturnValue(of(applications)),
-    getJob: vi
-      .fn()
-      .mockImplementation((id: string) =>
-        of({ id, title: id === 'job-1' ? 'Frontend Engineer' : 'Staff Designer' }),
-      ),
-  };
+  const api = { getMyApplications: vi.fn().mockReturnValue(of(applications)) };
   const view = await render(CandidateHomePage, {
     providers: [
       provideRouter([]),
@@ -69,12 +70,15 @@ describe('CandidateHomePage', () => {
     expect(screen.getByText(/Interview .*2027/)).toBeTruthy();
   });
 
-  it('resolves each distinct job only once', async () => {
-    const { api } = await renderHome([
-      ...APPLICATIONS,
-      { ...APPLICATIONS[1], id: 'app-3', jobPostingId: 'job-1' },
-    ]);
-    expect(api.getJob).toHaveBeenCalledTimes(2);
+  it('reads titles straight off the row — no per-posting fan-out', async () => {
+    const { api } = await renderHome();
+    expect(api).not.toHaveProperty('getJob');
+    expect(api.getMyApplications).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back gracefully when a posting was deleted', async () => {
+    await renderHome([{ ...APPLICATIONS[1], jobTitle: null, companyName: null }]);
+    expect(screen.getByText('Role no longer available')).toBeTruthy();
   });
 
   it('invites the candidate to browse roles when there are no applications', async () => {

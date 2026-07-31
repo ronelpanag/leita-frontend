@@ -38,21 +38,42 @@ describe('ApiClient', () => {
     await call;
   });
 
-  it('posts refresh with skip-refresh so a 401 there is not retried', async () => {
-    const call = firstValueFrom(api.refresh('r-1'));
+  it('refreshes from the cookie: no body, credentials included, skip-refresh', async () => {
+    const call = firstValueFrom(api.refresh());
     const request = http.expectOne('/api/auth/refresh');
-    expect(request.request.body).toEqual({ refreshToken: 'r-1' });
+    expect(request.request.body).toBeNull();
+    expect(request.request.withCredentials).toBe(true);
     expect(request.request.context.get(SKIP_AUTH_REFRESH)).toBe(true);
     request.flush({ accessToken: 'a', accessTokenExpiresAtUtc: 'x', refreshToken: 'r2' });
     await call;
   });
 
-  it('gets open jobs with paging params', async () => {
+  it('logs out server-side with credentials so the cookie is cleared', async () => {
+    const call = firstValueFrom(api.logout());
+    const request = http.expectOne('/api/auth/logout');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.withCredentials).toBe(true);
+    request.flush(null);
+    await call;
+  });
+
+  it('gets open jobs with paging params, omitting empty search terms', async () => {
     const call = firstValueFrom(api.getOpenJobs(2, 50));
     const request = http.expectOne((r) => r.url === '/api/public/jobs');
     expect(request.request.params.get('page')).toBe('2');
     expect(request.request.params.get('pageSize')).toBe('50');
+    expect(request.request.params.has('q')).toBe(false);
+    expect(request.request.params.has('location')).toBe(false);
     request.flush({ items: [], page: 2, pageSize: 50, totalCount: 0, totalPages: 0 });
+    await call;
+  });
+
+  it('passes search terms through to the server', async () => {
+    const call = firstValueFrom(api.getOpenJobs(1, 20, 'engineer', 'oslo'));
+    const request = http.expectOne((r) => r.url === '/api/public/jobs');
+    expect(request.request.params.get('q')).toBe('engineer');
+    expect(request.request.params.get('location')).toBe('oslo');
+    request.flush({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 });
     await call;
   });
 
@@ -101,6 +122,21 @@ describe('ApiClient', () => {
     const followed = firstValueFrom(api.getFollowedCompanies());
     http.expectOne((r) => r.url === '/api/candidate/follows' && r.method === 'GET').flush([]);
     await followed;
+  });
+
+  it('lists and edits company jobs', async () => {
+    const list = firstValueFrom(api.getCompanyJobs());
+    http.expectOne((r) => r.url === '/api/company/jobs' && r.method === 'GET').flush([]);
+    await list;
+
+    const update = firstValueFrom(
+      api.updateJob('job-1', { title: 'T2', description: 'D2', location: 'Bergen' }),
+    );
+    const updateReq = http.expectOne('/api/company/jobs/job-1');
+    expect(updateReq.request.method).toBe('PUT');
+    expect(updateReq.request.body).toEqual({ title: 'T2', description: 'D2', location: 'Bergen' });
+    updateReq.flush(null);
+    await update;
   });
 
   it('creates, publishes and closes company jobs', async () => {

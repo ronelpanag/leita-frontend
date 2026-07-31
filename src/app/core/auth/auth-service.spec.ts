@@ -4,9 +4,20 @@ import { TestBed } from '@angular/core/testing';
 import { AuthService } from './auth-service';
 import { CANDIDATE_JWT, COMPANY_JWT, fakeJwt } from './testing/fake-tokens';
 
+const SESSION_HINT = 'leita.hasSession';
+
+/** The refresh token lives in an httpOnly cookie, so responses only carry the pair. */
+function tokens(accessToken = CANDIDATE_JWT) {
+  return {
+    accessToken,
+    accessTokenExpiresAtUtc: new Date(Date.now() + 900_000).toISOString(),
+    refreshToken: 'rotated-server-side',
+  };
+}
+
 describe('AuthService', () => {
   beforeEach(() => {
-    sessionStorage.clear();
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
@@ -14,21 +25,18 @@ describe('AuthService', () => {
 
   afterEach(() => {
     TestBed.inject(HttpTestingController).verify();
-    sessionStorage.clear();
+    localStorage.clear();
   });
 
-  it('stores the access token in memory and decodes the user on login', async () => {
+  it('keeps the access token in memory only and never persists a refresh token', async () => {
     const auth = TestBed.inject(AuthService);
     const http = TestBed.inject(HttpTestingController);
 
     const login = auth.login('nora@example.no', 'Passw0rd!');
     const request = http.expectOne('/api/auth/login');
     expect(request.request.method).toBe('POST');
-    request.flush({
-      accessToken: CANDIDATE_JWT,
-      accessTokenExpiresAtUtc: new Date(Date.now() + 900_000).toISOString(),
-      refreshToken: 'refresh-1',
-    });
+    expect(request.request.withCredentials).toBe(true);
+    request.flush(tokens());
     await login;
 
     expect(auth.isAuthenticated()).toBe(true);
@@ -39,9 +47,10 @@ describe('AuthService', () => {
       companyId: null,
     });
     expect(auth.homeUrl()).toBe('/candidate');
-    // Refresh token persisted for reload restore; access token is not.
-    expect(sessionStorage.getItem('leita.refreshToken')).toBe('refresh-1');
-    expect(Object.values(sessionStorage).includes(CANDIDATE_JWT)).toBe(false);
+    // Only a non-sensitive hint is stored; no token material reaches storage.
+    expect(localStorage.getItem(SESSION_HINT)).toBe('1');
+    expect(JSON.stringify(localStorage)).not.toContain('rotated-server-side');
+    expect(JSON.stringify(localStorage)).not.toContain(CANDIDATE_JWT);
   });
 
   it('maps company roles to the company home', async () => {
@@ -49,81 +58,69 @@ describe('AuthService', () => {
     const http = TestBed.inject(HttpTestingController);
 
     const login = auth.login('admin@fjellheim.no', 'Passw0rd!');
-    http.expectOne('/api/auth/login').flush({
-      accessToken: COMPANY_JWT,
-      accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'refresh-2',
-    });
+    http.expectOne('/api/auth/login').flush(tokens(COMPANY_JWT));
     await login;
 
     expect(auth.user()?.role).toBe('CompanyAdmin');
     expect(auth.homeUrl()).toBe('/company');
   });
 
-  it('rotates the stored refresh token on refresh', async () => {
+  it('refreshes from the cookie, sending no token in the body', async () => {
     const auth = TestBed.inject(AuthService);
     const http = TestBed.inject(HttpTestingController);
-    sessionStorage.setItem('leita.refreshToken', 'refresh-old');
 
     const refresh = auth.refresh();
     const request = http.expectOne('/api/auth/refresh');
-    expect(request.request.body).toEqual({ refreshToken: 'refresh-old' });
-    request.flush({
-      accessToken: CANDIDATE_JWT,
-      accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'refresh-new',
-    });
+    expect(request.request.body).toBeNull();
+    expect(request.request.withCredentials).toBe(true);
+    request.flush(tokens());
     await refresh;
 
-    expect(sessionStorage.getItem('leita.refreshToken')).toBe('refresh-new');
     expect(auth.isAuthenticated()).toBe(true);
   });
 
-  it('clears everything on logout', async () => {
+  it('revokes the session server-side on logout', async () => {
     const auth = TestBed.inject(AuthService);
     const http = TestBed.inject(HttpTestingController);
 
     const login = auth.login('nora@example.no', 'Passw0rd!');
-    http.expectOne('/api/auth/login').flush({
-      accessToken: CANDIDATE_JWT,
-      accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'refresh-1',
-    });
+    http.expectOne('/api/auth/login').flush(tokens());
     await login;
 
     auth.logout();
+
+    const request = http.expectOne('/api/auth/logout');
+    expect(request.request.withCredentials).toBe(true);
+    request.flush(null);
+
     expect(auth.isAuthenticated()).toBe(false);
     expect(auth.user()).toBeNull();
-    expect(sessionStorage.getItem('leita.refreshToken')).toBeNull();
+    expect(localStorage.getItem(SESSION_HINT)).toBeNull();
   });
 
-  it('refresh rejects when no refresh token is stored', async () => {
+  it('stays quiet on boot when no previous session is hinted', async () => {
     const auth = TestBed.inject(AuthService);
-    await expect(auth.refresh()).rejects.toThrow();
+    await auth.ready;
+    // No hint → no doomed refresh round-trip for anonymous visitors.
+    TestBed.inject(HttpTestingController).expectNone('/api/auth/refresh');
+    expect(auth.isAuthenticated()).toBe(false);
   });
 
-  it('restores the session on construction when a refresh token survives reload', async () => {
-    sessionStorage.setItem('leita.refreshToken', 'refresh-from-last-visit');
+  it('restores the session on boot when the hint says a cookie should exist', async () => {
+    localStorage.setItem(SESSION_HINT, '1');
 
     const auth = TestBed.inject(AuthService);
-    const readyPromise = auth.ready; // touching `ready` kicks off the restore
+    const readyPromise = auth.ready;
     const http = TestBed.inject(HttpTestingController);
-    const request = http.expectOne('/api/auth/refresh');
-    expect(request.request.body).toEqual({ refreshToken: 'refresh-from-last-visit' });
-    request.flush({
-      accessToken: CANDIDATE_JWT,
-      accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'refresh-rotated',
-    });
+    http.expectOne('/api/auth/refresh').flush(tokens());
     await readyPromise;
 
     expect(auth.isAuthenticated()).toBe(true);
     expect(auth.user()?.role).toBe('Candidate');
-    expect(sessionStorage.getItem('leita.refreshToken')).toBe('refresh-rotated');
   });
 
-  it('clears the stale token when restore is rejected', async () => {
-    sessionStorage.setItem('leita.refreshToken', 'refresh-expired');
+  it('clears the hint when the cookie turns out to be gone', async () => {
+    localStorage.setItem(SESSION_HINT, '1');
 
     const auth = TestBed.inject(AuthService);
     const readyPromise = auth.ready;
@@ -132,7 +129,7 @@ describe('AuthService', () => {
     await readyPromise;
 
     expect(auth.isAuthenticated()).toBe(false);
-    expect(sessionStorage.getItem('leita.refreshToken')).toBeNull();
+    expect(localStorage.getItem(SESSION_HINT)).toBeNull();
   });
 
   it('treats a malformed token as an unauthenticated session', async () => {
@@ -140,14 +137,9 @@ describe('AuthService', () => {
     const http = TestBed.inject(HttpTestingController);
 
     const login = auth.login('nora@example.no', 'pw');
-    http.expectOne('/api/auth/login').flush({
-      accessToken: 'not-a-jwt',
-      accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'refresh-1',
-    });
+    http.expectOne('/api/auth/login').flush(tokens('not-a-jwt'));
     await login;
 
-    // The access token is still held, but no user could be decoded.
     expect(auth.user()).toBeNull();
     expect(auth.homeUrl()).toBe('/jobs');
   });
@@ -157,11 +149,9 @@ describe('AuthService', () => {
     const http = TestBed.inject(HttpTestingController);
 
     const login = auth.login('someone@example.no', 'pw');
-    http.expectOne('/api/auth/login').flush({
-      accessToken: fakeJwt({ email: 'someone@example.no', role: 'Wizard' }),
-      accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'refresh-1',
-    });
+    http
+      .expectOne('/api/auth/login')
+      .flush(tokens(fakeJwt({ email: 'someone@example.no', role: 'Wizard' })));
     await login;
 
     expect(auth.user()).toBeNull();

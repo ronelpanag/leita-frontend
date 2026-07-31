@@ -95,6 +95,21 @@ export interface CreateJobPostingRequest {
   readonly location: string | null;
 }
 
+/** Same shape as create; closed postings are immutable (the API answers 400). */
+export type UpdateJobPostingRequest = CreateJobPostingRequest;
+
+/** Row of the company dashboard — every posting, with its application count. */
+export interface CompanyJobPosting {
+  readonly id: string;
+  readonly title: string;
+  readonly location: string | null;
+  readonly status: JobPostingStatus;
+  readonly createdAtUtc: string;
+  readonly publishedAtUtc: string | null;
+  readonly closedAtUtc: string | null;
+  readonly applicationCount: number;
+}
+
 // --- Applications ---
 
 export interface Interview {
@@ -103,11 +118,20 @@ export interface Interview {
   readonly location: string | null;
 }
 
+/**
+ * Denormalized: the API carries the names both dashboards need, so clients
+ * never fan out per-row lookups. Names are null when the related record was
+ * deleted — the application row itself survives.
+ */
 export interface Application {
   readonly id: string;
   readonly jobPostingId: string;
+  readonly jobTitle: string | null;
+  readonly companyName: string | null;
   readonly candidateId: string;
+  readonly candidateDisplayName: string | null;
   readonly currentStage: PipelineStage;
+  readonly coverLetter: string | null;
   readonly submittedAtUtc: string;
   readonly interviews: readonly Interview[];
 }

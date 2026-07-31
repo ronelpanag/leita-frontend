@@ -19,10 +19,9 @@ import { JobCard } from './job-card';
 const PAGE_SIZE = 20;
 
 /**
- * Public job board. Pagination is server-side; keyword/location filtering is
- * client-side over the loaded page because the backend query does not accept
- * search parameters yet (see docs/backend-follow-ups.md). Filters and page
- * live in the URL so results are shareable and survive reload.
+ * Public job board. Pagination and search are both server-side: `q` matches
+ * title and description, `location` matches location. Filters and page live in
+ * the URL so results are shareable and survive reload.
  */
 @Component({
   selector: 'app-job-board-page',
@@ -70,11 +69,11 @@ const PAGE_SIZE = 20;
           >
             <app-button variant="secondary" (click)="load()">Try again</app-button>
           </app-empty-state>
-        } @else if (filteredJobs().length === 0) {
+        } @else if (jobs().length === 0) {
           @if (hasFilters()) {
             <app-empty-state
               title="No roles match your search"
-              description="Try a broader keyword or clear the filters to see everything on this page."
+              description="Try a broader keyword, or clear the filters to see every open role."
             >
               <app-button variant="secondary" (click)="clearFilters()">Clear filters</app-button>
             </app-empty-state>
@@ -89,7 +88,7 @@ const PAGE_SIZE = 20;
             {{ resultSummary() }}
           </p>
           <ul class="mt-4 flex flex-col gap-4">
-            @for (job of filteredJobs(); track job.id) {
+            @for (job of jobs(); track job.id) {
               <li>
                 <app-job-card [job]="job" />
               </li>
@@ -150,16 +149,7 @@ export class JobBoardPage {
   protected readonly currentPage = computed(() => Math.max(1, Number(this.page()) || 1));
   protected readonly totalPages = computed(() => this.result()?.totalPages ?? 0);
 
-  protected readonly filteredJobs = computed(() => {
-    const jobs = this.result()?.items ?? [];
-    const keyword = this.keywordValue().trim().toLowerCase();
-    const place = this.placeValue().trim().toLowerCase();
-    return jobs.filter(
-      (job) =>
-        (!keyword || job.title.toLowerCase().includes(keyword)) &&
-        (!place || (job.location ?? '').toLowerCase().includes(place)),
-    );
-  });
+  protected readonly jobs = computed(() => this.result()?.items ?? []);
 
   protected readonly hasFilters = computed(
     () => this.keywordValue().trim() !== '' || this.placeValue().trim() !== '',
@@ -167,14 +157,13 @@ export class JobBoardPage {
 
   protected readonly resultSummary = computed(() => {
     const total = this.result()?.totalCount ?? 0;
-    const shown = this.filteredJobs().length;
-    if (this.hasFilters()) {
-      return `${shown} of ${total} open roles match`;
-    }
-    return `${total} open roles`;
+    const noun = total === 1 ? 'open role' : 'open roles';
+    return this.hasFilters() ? `${total} ${noun} match` : `${total} ${noun}`;
   });
 
   private urlSyncTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Last search terms actually sent to the API, so we don't refetch on echo. */
+  private appliedQuery = { q: '', loc: '' };
 
   constructor() {
     // Seed the filter fields from the URL once.
@@ -193,18 +182,24 @@ export class JobBoardPage {
       untracked(() => void this.load());
     });
 
-    // Keep the URL truthful (debounced, replace so typing doesn't spam history).
+    // Search is server-side, so a filter change both rewrites the URL and
+    // refetches — debounced, and back to page 1 since the result set changed.
     effect(() => {
       const q = this.keywordValue().trim();
       const loc = this.placeValue().trim();
       untracked(() => {
+        if (q === this.appliedQuery.q && loc === this.appliedQuery.loc) {
+          return;
+        }
         clearTimeout(this.urlSyncTimer);
         this.urlSyncTimer = setTimeout(() => {
+          this.appliedQuery = { q, loc };
           void this.router.navigate([], {
-            queryParams: { q: q || null, loc: loc || null },
+            queryParams: { q: q || null, loc: loc || null, page: null },
             queryParamsHandling: 'merge',
             replaceUrl: true,
           });
+          void this.load();
         }, 300);
       });
     });
@@ -214,7 +209,16 @@ export class JobBoardPage {
     this.loading.set(true);
     this.error.set(false);
     try {
-      this.result.set(await firstValueFrom(this.api.getOpenJobs(this.currentPage(), PAGE_SIZE)));
+      this.result.set(
+        await firstValueFrom(
+          this.api.getOpenJobs(
+            this.currentPage(),
+            PAGE_SIZE,
+            this.keywordValue().trim(),
+            this.placeValue().trim(),
+          ),
+        ),
+      );
     } catch {
       this.error.set(true);
     } finally {

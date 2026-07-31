@@ -4,12 +4,6 @@ import { ApiClient, AuthService, type Application, type PipelineStage } from '@c
 import { Badge, Button, ButtonLink, EmptyState, Spinner, type BadgeTone } from '@shared';
 import { firstValueFrom } from 'rxjs';
 
-interface ApplicationRow {
-  readonly application: Application;
-  readonly jobTitle: string;
-  readonly nextInterview: string | null;
-}
-
 const STAGE_TONES: Record<PipelineStage, BadgeTone> = {
   Applied: 'neutral',
   Screening: 'info',
@@ -67,29 +61,34 @@ const interviewFormat = new Intl.DateTimeFormat(undefined, {
             <app-button-link to="/jobs" variant="secondary">Browse open roles</app-button-link>
           </app-empty-state>
         } @else {
-          <p class="text-body-sm text-ink-muted">{{ rows().length }} applications</p>
+          <p class="text-body-sm text-ink-muted">
+            {{ rows().length }} {{ rows().length === 1 ? 'application' : 'applications' }}
+          </p>
           <ul class="mt-4 flex flex-col gap-3">
-            @for (row of rows(); track row.application.id) {
+            @for (row of rows(); track row.id) {
               <li
                 class="flex flex-wrap items-center justify-between gap-3 rounded-card border
                        border-line bg-paper px-5 py-4"
               >
                 <div class="min-w-0">
                   <a
-                    [routerLink]="['/jobs', row.application.jobPostingId]"
+                    [routerLink]="['/jobs', row.jobPostingId]"
                     class="break-words text-body font-medium text-ink hover:text-spruce-700 hover:underline"
                   >
-                    {{ row.jobTitle }}
+                    {{ row.jobTitle ?? 'Role no longer available' }}
                   </a>
                   <p class="mt-0.5 font-mono text-caption text-ink-muted">
-                    Applied {{ submittedLabel(row.application) }}
-                    @if (row.nextInterview) {
-                      · Interview {{ row.nextInterview }}
+                    @if (row.companyName) {
+                      {{ row.companyName }} ·
+                    }
+                    Applied {{ submittedLabel(row) }}
+                    @if (nextInterviewLabel(row); as interview) {
+                      · Interview {{ interview }}
                     }
                   </p>
                 </div>
-                <app-badge [tone]="stageTone(row.application.currentStage)" [waymark]="true">
-                  {{ row.application.currentStage }}
+                <app-badge [tone]="stageTone(row.currentStage)" [waymark]="true">
+                  {{ row.currentStage }}
                 </app-badge>
               </li>
             }
@@ -103,7 +102,7 @@ export class CandidateHomePage {
   private readonly api = inject(ApiClient);
   protected readonly auth = inject(AuthService);
 
-  protected readonly rows = signal<readonly ApplicationRow[]>([]);
+  protected readonly rows = signal<readonly Application[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal(false);
 
@@ -115,29 +114,8 @@ export class CandidateHomePage {
     this.loading.set(true);
     this.error.set(false);
     try {
-      const applications = await firstValueFrom(this.api.getMyApplications());
-      // ApplicationDto carries only jobPostingId — resolve titles via the
-      // public endpoint (one call per distinct job). Flagged in
-      // docs/backend-follow-ups.md: the DTO should include the job title.
-      const uniqueJobIds = [...new Set(applications.map((a) => a.jobPostingId))];
-      const titles = new Map<string, string>();
-      await Promise.all(
-        uniqueJobIds.map(async (id) => {
-          try {
-            const job = await firstValueFrom(this.api.getJob(id));
-            titles.set(id, job.title);
-          } catch {
-            titles.set(id, 'Role unavailable');
-          }
-        }),
-      );
-      this.rows.set(
-        applications.map((application) => ({
-          application,
-          jobTitle: titles.get(application.jobPostingId) ?? 'Role unavailable',
-          nextInterview: this.nextInterviewLabel(application),
-        })),
-      );
+      // The API denormalizes jobTitle/companyName onto each row — no fan-out.
+      this.rows.set(await firstValueFrom(this.api.getMyApplications()));
     } catch {
       this.error.set(true);
     } finally {
@@ -153,7 +131,7 @@ export class CandidateHomePage {
     return submittedFormat.format(new Date(application.submittedAtUtc));
   }
 
-  private nextInterviewLabel(application: Application): string | null {
+  protected nextInterviewLabel(application: Application): string | null {
     const upcoming = application.interviews
       .map((interview) => new Date(interview.scheduledAtUtc))
       .filter((date) => date.getTime() > Date.now())
