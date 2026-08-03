@@ -29,7 +29,15 @@ const LEGAL = {
 };
 
 const companies = new Map([
-  ['aaaa1111-0000-0000-0000-000000000001', { id: 'aaaa1111-0000-0000-0000-000000000001', name: 'Fjellheim AS', description: 'Nordic outdoor software.', website: null }],
+  [
+    'aaaa1111-0000-0000-0000-000000000001',
+    {
+      id: 'aaaa1111-0000-0000-0000-000000000001',
+      name: 'Fjellheim AS',
+      description: 'Nordic outdoor software.',
+      website: null,
+    },
+  ],
 ]);
 const jobs = [
   {
@@ -115,7 +123,8 @@ createServer((req, res) => {
 
     if (route === 'POST /api/auth/login') {
       const user = users.get(body.email);
-      if (!user || user.password !== body.password) return json(res, 401, { title: 'Invalid credentials.' });
+      if (!user || user.password !== body.password)
+        return json(res, 401, { title: 'Invalid credentials.' });
       const session = issue(body.email);
       return json(res, 200, session.body, refreshCookie(session.refreshToken));
     }
@@ -143,14 +152,29 @@ createServer((req, res) => {
         displayName: body.displayName,
       });
       const session = issue(body.email);
-      return json(res, 201, { candidateId, tokens: session.body }, refreshCookie(session.refreshToken));
+      return json(
+        res,
+        201,
+        { candidateId, tokens: session.body },
+        refreshCookie(session.refreshToken),
+      );
     }
     if (route === 'POST /api/company/register') {
       const companyId = randomUUID();
-      companies.set(companyId, { id: companyId, name: body.companyName, description: body.description ?? null, website: body.website ?? null });
+      companies.set(companyId, {
+        id: companyId,
+        name: body.companyName,
+        description: body.description ?? null,
+        website: body.website ?? null,
+      });
       users.set(body.email, { password: body.password, role: 'CompanyAdmin', companyId });
       const session = issue(body.email);
-      return json(res, 201, { companyId, tokens: session.body }, refreshCookie(session.refreshToken));
+      return json(
+        res,
+        201,
+        { companyId, tokens: session.body },
+        refreshCookie(session.refreshToken),
+      );
     }
 
     // Public
@@ -168,7 +192,13 @@ createServer((req, res) => {
         .filter((j) => !q || (j.title + ' ' + j.description).toLowerCase().includes(q))
         .filter((j) => !loc || (j.location ?? '').toLowerCase().includes(loc))
         .map(summary);
-      return json(res, 200, { items: published, page: 1, pageSize: 20, totalCount: published.length, totalPages: 1 });
+      return json(res, 200, {
+        items: published,
+        page: 1,
+        pageSize: 20,
+        totalCount: published.length,
+        totalPages: 1,
+      });
     }
 
     // Candidate
@@ -202,7 +232,11 @@ createServer((req, res) => {
     }
     if (route === 'GET /api/candidate/follows') {
       if (!candidateId) return json(res, 401, { title: 'Unauthorized' });
-      return json(res, 200, [...(follows.get(candidateId) ?? new Set())].map((id) => companies.get(id)).filter(Boolean));
+      return json(
+        res,
+        200,
+        [...(follows.get(candidateId) ?? new Set())].map((id) => companies.get(id)).filter(Boolean),
+      );
     }
 
     // Company
@@ -231,14 +265,29 @@ createServer((req, res) => {
     if (req.method === 'PUT' && editMatch) {
       const job = jobs.find((j) => j.id === editMatch[1]);
       if (!job) return json(res, 404, { title: 'Not found' });
-      if (job.status === 'Closed') return json(res, 400, { title: 'Closed postings are immutable.' });
-      Object.assign(job, { title: body.title, description: body.description, location: body.location });
+      if (job.status === 'Closed')
+        return json(res, 400, { title: 'Closed postings are immutable.' });
+      Object.assign(job, {
+        title: body.title,
+        description: body.description,
+        location: body.location,
+      });
       return noContent(res);
     }
 
     if (route === 'POST /api/company/jobs') {
       if (!companyId) return json(res, 401, { title: 'Unauthorized' });
-      const job = { id: randomUUID(), companyId, title: body.title, description: body.description, location: body.location, status: 'Draft', createdAtUtc: new Date().toISOString(), publishedAtUtc: null, closedAtUtc: null };
+      const job = {
+        id: randomUUID(),
+        companyId,
+        title: body.title,
+        description: body.description,
+        location: body.location,
+        status: 'Draft',
+        createdAtUtc: new Date().toISOString(),
+        publishedAtUtc: null,
+        closedAtUtc: null,
+      };
       jobs.push(job);
       return json(res, 201, { id: job.id });
     }
@@ -246,8 +295,13 @@ createServer((req, res) => {
     if (req.method === 'POST' && pub) {
       const job = jobs.find((j) => j.id === pub[1]);
       if (!job) return json(res, 404, { title: 'Not found' });
-      if (pub[2] === 'publish') { job.status = 'Published'; job.publishedAtUtc = new Date().toISOString(); }
-      else { job.status = 'Closed'; job.closedAtUtc = new Date().toISOString(); }
+      if (pub[2] === 'publish') {
+        job.status = 'Published';
+        job.publishedAtUtc = new Date().toISOString();
+      } else {
+        job.status = 'Closed';
+        job.closedAtUtc = new Date().toISOString();
+      }
       return noContent(res);
     }
     const jobApps = req.url.match(/^\/api\/company\/jobs\/([0-9a-f-]+)\/applications$/);
@@ -258,7 +312,8 @@ createServer((req, res) => {
     if (req.method === 'POST' && stage) {
       const app = applications.find((a) => a.id === stage[1]);
       if (!app) return json(res, 404, { title: 'Not found' });
-      if (!LEGAL[app.currentStage].includes(body.nextStage)) return json(res, 409, { title: 'Illegal transition' });
+      if (!LEGAL[app.currentStage].includes(body.nextStage))
+        return json(res, 409, { title: 'Illegal transition' });
       app.currentStage = body.nextStage;
       return noContent(res);
     }
@@ -266,7 +321,11 @@ createServer((req, res) => {
     if (req.method === 'POST' && interview) {
       const app = applications.find((a) => a.id === interview[1]);
       if (!app) return json(res, 404, { title: 'Not found' });
-      const created = { id: randomUUID(), scheduledAtUtc: body.scheduledAtUtc, location: body.location };
+      const created = {
+        id: randomUUID(),
+        scheduledAtUtc: body.scheduledAtUtc,
+        location: body.location,
+      };
       app.interviews.push(created);
       return json(res, 201, { id: created.id });
     }

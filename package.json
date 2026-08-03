@@ -10,6 +10,8 @@
     "test:coverage": "ng test --coverage",
     "e2e": "playwright test",
     "lint": "ng lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "prepare": "husky"
   },
   "private": true,
