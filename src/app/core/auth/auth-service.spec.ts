@@ -6,13 +6,9 @@ import { CANDIDATE_JWT, COMPANY_JWT, fakeJwt } from './testing/fake-tokens';
 
 const SESSION_HINT = 'leita.hasSession';
 
-/** The refresh token lives in an httpOnly cookie, so responses only carry the pair. */
+/** The refresh token lives in an httpOnly cookie; bodies carry the access token only. */
 function tokens(accessToken = CANDIDATE_JWT) {
-  return {
-    accessToken,
-    accessTokenExpiresAtUtc: new Date(Date.now() + 900_000).toISOString(),
-    refreshToken: 'rotated-server-side',
-  };
+  return { accessToken, accessTokenExpiresAtUtc: new Date(Date.now() + 900_000).toISOString() };
 }
 
 describe('AuthService', () => {
@@ -49,8 +45,21 @@ describe('AuthService', () => {
     expect(auth.homeUrl()).toBe('/candidate');
     // Only a non-sensitive hint is stored; no token material reaches storage.
     expect(localStorage.getItem(SESSION_HINT)).toBe('1');
-    expect(JSON.stringify(localStorage)).not.toContain('rotated-server-side');
     expect(JSON.stringify(localStorage)).not.toContain(CANDIDATE_JWT);
+  });
+
+  it('never reads a refresh token out of a response body', async () => {
+    const auth = TestBed.inject(AuthService);
+    const http = TestBed.inject(HttpTestingController);
+
+    // The API stopped emitting one; even if a stray value appeared, nothing
+    // may pick it up and put it back into JavaScript-readable storage.
+    const login = auth.login('nora@example.no', 'Passw0rd!');
+    http.expectOne('/api/auth/login').flush({ ...tokens(), refreshToken: 'must-never-be-stored' });
+    await login;
+
+    expect(JSON.stringify(localStorage)).not.toContain('must-never-be-stored');
+    expect(JSON.stringify(sessionStorage)).not.toContain('must-never-be-stored');
   });
 
   it('maps company roles to the company home', async () => {

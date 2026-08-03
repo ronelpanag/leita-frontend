@@ -29,10 +29,14 @@ export interface LoginRequest {
   readonly password: string;
 }
 
+/**
+ * Login/register/refresh responses carry the access token only. The refresh
+ * token never appears in a body — it lives solely in the httpOnly
+ * `leita_refresh` cookie the API sets and rotates.
+ */
 export interface AuthResponse {
   readonly accessToken: string;
   readonly accessTokenExpiresAtUtc: string;
-  readonly refreshToken: string;
 }
 
 export interface RegisterCandidateRequest {

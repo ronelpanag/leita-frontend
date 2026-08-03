@@ -49,6 +49,11 @@ const refreshTokens = new Map();
 const applications = [];
 const follows = new Map();
 
+/**
+ * Issues a session. The response body carries the access token only — the
+ * refresh token is returned separately so the caller can put it in the
+ * httpOnly cookie, mirroring the API (it never appears in a JSON body).
+ */
 function issue(email) {
   const user = users.get(email);
   const payload = { sub: email, email, role: user.role, exp: Math.floor(Date.now() / 1000) + 900 };
@@ -57,7 +62,10 @@ function issue(email) {
   const accessToken = `${b64url({ alg: 'none' })}.${b64url(payload)}.stub`;
   const refreshToken = randomUUID();
   refreshTokens.set(refreshToken, email);
-  return { accessToken, accessTokenExpiresAtUtc: new Date(Date.now() + 900_000).toISOString(), refreshToken };
+  return {
+    body: { accessToken, accessTokenExpiresAtUtc: new Date(Date.now() + 900_000).toISOString() },
+    refreshToken,
+  };
 }
 
 const REFRESH_COOKIE = 'leita_refresh';
@@ -108,17 +116,17 @@ createServer((req, res) => {
     if (route === 'POST /api/auth/login') {
       const user = users.get(body.email);
       if (!user || user.password !== body.password) return json(res, 401, { title: 'Invalid credentials.' });
-      const tokens = issue(body.email);
-      return json(res, 200, tokens, refreshCookie(tokens.refreshToken));
+      const session = issue(body.email);
+      return json(res, 200, session.body, refreshCookie(session.refreshToken));
     }
     if (route === 'POST /api/auth/refresh') {
-      // A body token wins (legacy clients); otherwise the httpOnly cookie.
-      const supplied = body.refreshToken ?? readCookie(req, REFRESH_COOKIE);
+      // Cookie only: a token supplied in the body is not accepted.
+      const supplied = readCookie(req, REFRESH_COOKIE);
       const email = supplied ? refreshTokens.get(supplied) : null;
       if (!email) return json(res, 401, { title: 'Invalid or expired refresh token.' });
       refreshTokens.delete(supplied);
-      const tokens = issue(email);
-      return json(res, 200, tokens, refreshCookie(tokens.refreshToken));
+      const session = issue(email);
+      return json(res, 200, session.body, refreshCookie(session.refreshToken));
     }
     if (route === 'POST /api/auth/logout') {
       const supplied = readCookie(req, REFRESH_COOKIE);
@@ -134,15 +142,15 @@ createServer((req, res) => {
         candidateId,
         displayName: body.displayName,
       });
-      const tokens = issue(body.email);
-      return json(res, 201, { candidateId, tokens }, refreshCookie(tokens.refreshToken));
+      const session = issue(body.email);
+      return json(res, 201, { candidateId, tokens: session.body }, refreshCookie(session.refreshToken));
     }
     if (route === 'POST /api/company/register') {
       const companyId = randomUUID();
       companies.set(companyId, { id: companyId, name: body.companyName, description: body.description ?? null, website: body.website ?? null });
       users.set(body.email, { password: body.password, role: 'CompanyAdmin', companyId });
-      const tokens = issue(body.email);
-      return json(res, 201, { companyId, tokens }, refreshCookie(tokens.refreshToken));
+      const session = issue(body.email);
+      return json(res, 201, { companyId, tokens: session.body }, refreshCookie(session.refreshToken));
     }
 
     // Public

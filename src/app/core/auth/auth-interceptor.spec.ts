@@ -35,7 +35,6 @@ describe('authInterceptor', () => {
     controller.expectOne('/api/auth/login').flush({
       accessToken: CANDIDATE_JWT,
       accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'rotated-server-side',
     });
     await request;
   }
@@ -72,7 +71,6 @@ describe('authInterceptor', () => {
     refresh.flush({
       accessToken: CANDIDATE_JWT,
       accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'rotated-again',
     });
     // The retry is issued after the refresh promise resolves (a microtask).
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -122,7 +120,6 @@ describe('authInterceptor', () => {
     request.flush({
       accessToken: CANDIDATE_JWT,
       accessTokenExpiresAtUtc: new Date().toISOString(),
-      refreshToken: 'rotated-server-side',
     });
     await readyPromise;
 

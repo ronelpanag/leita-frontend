@@ -22,7 +22,6 @@ async function loginAsCandidate(): Promise<void> {
   http.expectOne('/api/auth/login').flush({
     accessToken: CANDIDATE_JWT,
     accessTokenExpiresAtUtc: new Date().toISOString(),
-    refreshToken: 'rotated-server-side',
   });
   await login;
 }

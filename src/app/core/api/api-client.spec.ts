@@ -34,7 +34,7 @@ describe('ApiClient', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({ email: 'nora@example.no', password: 'pw' });
     expect(request.request.context.get(SKIP_AUTH_REFRESH)).toBe(true);
-    request.flush({ accessToken: 'a', accessTokenExpiresAtUtc: 'x', refreshToken: 'r' });
+    request.flush({ accessToken: 'a', accessTokenExpiresAtUtc: 'x' });
     await call;
   });
 
@@ -44,7 +44,7 @@ describe('ApiClient', () => {
     expect(request.request.body).toBeNull();
     expect(request.request.withCredentials).toBe(true);
     expect(request.request.context.get(SKIP_AUTH_REFRESH)).toBe(true);
-    request.flush({ accessToken: 'a', accessTokenExpiresAtUtc: 'x', refreshToken: 'r2' });
+    request.flush({ accessToken: 'a', accessTokenExpiresAtUtc: 'x' });
     await call;
   });
 
