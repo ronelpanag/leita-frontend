@@ -43,7 +43,7 @@ describe('JobBoardPage', () => {
     const { api } = await renderBoard();
     expect(api.getOpenJobs).toHaveBeenCalledWith(1, 20, '', '');
     expect(screen.getByText('Frontend Engineer')).toBeTruthy();
-    expect(screen.getByText('2 open roles')).toBeTruthy();
+    expect(screen.getByText('999 open roles')).toBeTruthy(); // TEMPORARY: proves CI fails on a failing test
   });
 
   it('marks promoted postings as featured', async () => {

@@ -40,3 +40,6 @@ export class JobCard {
     return publishedAt ? publishedFormat.format(new Date(publishedAt)) : '';
   });
 }
+
+// TEMPORARY: proves CI fails on a lint violation. Removed in the next commit.
+const unusedOnPurpose: string = 'ci red check';
