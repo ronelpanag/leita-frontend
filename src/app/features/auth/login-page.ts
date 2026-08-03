@@ -84,7 +84,7 @@ export class LoginPage {
     this.formError.set('');
     try {
       await this.auth.login(this.email.value, this.password.value);
-      const returnTo = this.route.snapshot.queryParamMap.get('returnTo');
+      const returnTo = safeReturnTo(this.route.snapshot.queryParamMap.get('returnTo'));
       await this.router.navigateByUrl(returnTo ?? this.auth.homeUrl());
     } catch {
       this.formError.set('That email and password combination did not match. Try again.');
@@ -92,4 +92,22 @@ export class LoginPage {
       this.submitting.set(false);
     }
   }
+}
+
+/**
+ * Accepts only in-app paths, so a crafted `?returnTo=` cannot send someone
+ * somewhere else after they hand over their password. Angular's Router already
+ * refuses to leave the origin (an absolute or protocol-relative value simply
+ * fails to match a route and falls through to the wildcard), so this is
+ * defence in depth against a later refactor that reaches for
+ * `window.location` — and it fixes the user-visible half too: a bogus value
+ * used to dump you on the public board instead of your own home.
+ */
+export function safeReturnTo(value: string | null): string | null {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+    return null;
+  }
+  // Backslashes are normalised to slashes by some browsers, so "/\evil.com"
+  // is another way of writing a protocol-relative URL.
+  return value.includes('\\') ? null : value;
 }

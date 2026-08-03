@@ -46,7 +46,25 @@ answers 400 for those.
 See [auth-token-storage.md](auth-token-storage.md). No token material reaches
 JavaScript storage any more.
 
-## 6. SSR / prerendering for job detail SEO — frontend-side, not urgent
+## 6. CSRF on the auth endpoints, _if_ the deployment goes cross-origin — ⚠️ open
+
+Not a problem today: business endpoints use a Bearer header (unforgeable
+cross-site) and the cookie-authenticated `POST /api/auth/refresh` is protected by
+`SameSite=Lax`.
+
+It becomes one the moment the frontend and API sit on different registrable
+domains — which is exactly what Static Web Apps' free tier forces, since the
+cookie would have to become `SameSite=None; Secure` to be sent at all. At that
+point `/api/auth/refresh` and `/api/auth/logout` are forgeable from any origin
+(the attacker cannot read the response, but can rotate a victim's refresh token
+or log them out at will).
+
+If we deploy cross-origin, the API needs an anti-forgery token or an `Origin`
+check on `/api/auth/*`. Keeping the two same-site (custom domain on both, or the
+Standard plan's linked backend) avoids it. Full reasoning in
+[security-review.md](security-review.md).
+
+## 7. SSR / prerendering for job detail SEO — frontend-side, not urgent
 
 Job detail pages set `<title>` and `meta description` at runtime. Crawlers
 that execute JS see them; plain-HTML crawlers do not. If organic search

@@ -42,6 +42,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/register-page').then((m) => m.RegisterPage),
     title: 'Create an account — Leita',
   },
+  {
+    path: '',
+    loadChildren: () => import('./features/legal/legal.routes').then((m) => m.LEGAL_ROUTES),
+  },
   ...devRoutes,
   { path: '**', redirectTo: 'jobs' },
 ];

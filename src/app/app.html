@@ -51,4 +51,22 @@
   <router-outlet />
 </main>
 
+<footer class="mt-section border-t border-line bg-paper">
+  <div
+    class="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-gutter py-6"
+  >
+    <p class="font-mono text-caption text-ink-muted">
+      Leita — <span translate="no">leita</span>, Old Norse for “to seek”.
+    </p>
+    <nav class="flex flex-wrap items-center gap-4" aria-label="Legal">
+      <a routerLink="/terms" class="text-body-sm text-ink-muted hover:text-ink hover:underline">
+        Terms and conditions
+      </a>
+      <a routerLink="/privacy" class="text-body-sm text-ink-muted hover:text-ink hover:underline">
+        Privacy and cookies
+      </a>
+    </nav>
+  </div>
+</footer>
+
 <app-toast-outlet />
